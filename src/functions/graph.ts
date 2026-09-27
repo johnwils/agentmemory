@@ -735,7 +735,14 @@ export function extractGraphHeuristics(
 // than in graph-indexes.ts so config.ts stays out of that module's import
 // graph (several tests partially mock it).
 export function graphWritesDisabled(): boolean {
-  return graphLegDisabled() || !isGraphExtractionEnabled();
+  return graphWritesOffReason() !== null;
+}
+
+export function graphWritesOffReason(): string | null {
+  const reasons: string[] = [];
+  if (!isGraphExtractionEnabled()) reasons.push("GRAPH_EXTRACTION_ENABLED is not true");
+  if (graphLegDisabled()) reasons.push("AGENTMEMORY_GRAPH_LEG=off");
+  return reasons.length > 0 ? reasons.join(", ") : null;
 }
 
 export async function persistGraphDelta(
