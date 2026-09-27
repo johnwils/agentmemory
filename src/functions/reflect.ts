@@ -381,7 +381,7 @@ export function registerReflectFunctions(
 
       items.sort((a, b) => b.confidence - a.confidence);
 
-      return { success: true, insights: items.slice(0, limit) };
+      return { success: true, insights: items.slice(0, limit), total: items.length };
     },
   );
 

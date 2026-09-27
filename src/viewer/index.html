@@ -1481,7 +1481,8 @@
           apiGet('procedural'),
           apiGet('relations'),
           apiGet('lessons'),
-          apiGet('crystals')
+          apiGet('crystals'),
+          apiGet('insights?limit=1')
         ]);
         state.dashboard.health = results[0];
         state.dashboard.sessions = (results[1] && results[1].sessions) || [];
@@ -1489,6 +1490,8 @@
         state.dashboard.graphStats = results[3];
         state.dashboard.recentAudit = (results[4] && results[4].entries) || [];
         state.dashboard.semantic = (results[5] && results[5].facts) || (results[5] && results[5].semantic) || [];
+        state.dashboard.semanticTotal = (results[5] && results[5].total) || state.dashboard.semantic.length;
+        state.dashboard.insightTotal = (results[10] && results[10].total) || 0;
         state.dashboard.procedural = (results[6] && results[6].procedures) || (results[6] && results[6].procedural) || [];
         state.dashboard.lessons = (results[8] && results[8].lessons) || [];
         state.dashboard.crystals = (results[9] && results[9].crystals) || [];
@@ -1555,6 +1558,8 @@
       var crystalCount = (d.crystals || []).length;
       html += '<div class="stat-card" data-action="goto-tab" data-tab="lessons" role="link" tabindex="0"><div class="label">Lessons</div><div class="value">' + lessonCount + '</div><div class="sub">confidence-scored</div></div>';
       html += '<div class="stat-card" data-action="goto-tab" data-tab="crystals" role="link" tabindex="0"><div class="label">Crystals</div><div class="value">' + crystalCount + '</div><div class="sub">action digests</div></div>';
+      html += '<div class="stat-card"><div class="label">Semantic Facts</div><div class="value">' + d.semanticTotal + '</div><div class="sub">consolidated</div></div>';
+      html += '<div class="stat-card"><div class="label">Insights</div><div class="value">' + d.insightTotal + '</div><div class="sub">reflected</div></div>';
       html += '<div class="stat-card" data-action="goto-tab" data-tab="graph" role="link" tabindex="0"><div class="label">Graph Nodes</div><div class="value">' + nodeCount + '</div><div class="sub">' + edgeCount + ' edges</div></div>';
       html += '<div class="stat-card"><div class="label">Health</div><div class="value"><div class="health-bar"><span class="health-dot ' + dotClass + '"></span> ' + esc(healthStatus) + '</div></div>';
       html += '<div class="sub">' + esc(snap.connectionState || 'unknown') + '</div>';

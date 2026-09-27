@@ -350,6 +350,12 @@ describe("Reflect", () => {
       const result = (await sdk.trigger("mem::insight-list", { minConfidence: 0.5 })) as { insights: Insight[] };
       expect(result.insights.length).toBe(1);
     });
+
+    it("reports the filtered total beyond the limit", async () => {
+      const result = (await sdk.trigger("mem::insight-list", { limit: 1 })) as { insights: Insight[]; total: number };
+      expect(result.insights.length).toBe(1);
+      expect(result.total).toBe(2);
+    });
   });
 
   describe("mem::insight-search", () => {
