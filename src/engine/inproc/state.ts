@@ -333,6 +333,26 @@ export class SqliteState {
     });
   }
 
+  // delete() per row in one transaction, like setMany, but only where the
+  // stored row's updatedAt still equals the one the caller read: a row
+  // rewritten since then (reflect regenerating a decayed Insight mid-sweep) is
+  // kept. Returns the keys actually deleted.
+  deleteManyIfUnchanged(
+    scope: string,
+    entries: Array<{ key: string; updatedAt: string }>,
+  ): string[] {
+    return this.transaction(() => {
+      const deleted: string[] = [];
+      for (const { key, updatedAt } of entries) {
+        const prev = this.read(scope, key);
+        if ((prev.value as { updatedAt?: unknown } | null)?.updatedAt !== updatedAt) continue;
+        this.delete(scope, key);
+        deleted.push(key);
+      }
+      return deleted;
+    });
+  }
+
   update(scope: string, key: string, ops: UpdateOp[]): {
     old_value: unknown;
     new_value: unknown;
@@ -407,8 +427,8 @@ async function cooperate<T>(result: T): Promise<T> {
 }
 
 // The function handlers, in the exact shapes `src/state/kv.ts` sends and the
-// engine returns (`state::set-many` is inproc-only; kv.ts never sends it to
-// iii). Registered on the shim by `sdk.ts`.
+// engine returns (`state::set-many` and `state::delete-many-if-unchanged` are
+// inproc-only; kv.ts never sends them to iii). Registered on the shim by `sdk.ts`.
 export function stateFunctions(
   store: SqliteState,
 ): Record<string, (payload: any) => Promise<unknown>> {
@@ -419,5 +439,7 @@ export function stateFunctions(
     "state::delete": async (p) => cooperate(store.delete(p.scope, p.key)),
     "state::list": async (p) => cooperate(store.list(p.scope)),
     "state::set-many": async (p) => cooperate(store.setMany(p.scope, p.entries ?? [])),
+    "state::delete-many-if-unchanged": async (p) =>
+      cooperate(store.deleteManyIfUnchanged(p.scope, p.entries ?? [])),
   };
 }

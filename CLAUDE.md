@@ -185,6 +185,10 @@ nothing more. Do not merge, rebase or cherry-pick from it, and do not restore a 
 file merely because upstream still carries it. `origin` carries `main` plus the branches of
 live PRs — an inherited upstream branch is deleted, never tracked.
 
+In PR bodies, issues, comments and commit messages, write an upstream issue or PR as
+`rohitg00/agentmemory#N`. A bare `#N` links to this fork, so it must only ever mean this
+fork's own issue or PR.
+
 Plugin distribution metadata (`homepage`, `repository`, marketplace sources, `plugin install`
 and `skills add` commands) must name `possiblyneal/agentmemory-sqlite`. Installing from
 upstream pulls upstream's 8 skills over this fork's 17. npm package metadata still names

@@ -326,6 +326,30 @@ describe("inproc state store: batched writes and event-loop cooperation", () => 
     expect(store.db.isTransaction).toBe(false);
   });
 
+  it("state::delete-many-if-unchanged deletes only rows whose updatedAt still matches", async () => {
+    const fns = stateFunctions(store);
+    const events: StateEvent[] = [];
+    store.watchScope("s");
+    store.onEvent((e) => events.push(e));
+    await fns["state::set"]({ scope: "s", key: "same", value: { updatedAt: "t1" } });
+    await fns["state::set"]({ scope: "s", key: "rewritten", value: { updatedAt: "t2" } });
+    events.length = 0;
+
+    const deleted = await fns["state::delete-many-if-unchanged"]({
+      scope: "s",
+      entries: [
+        { key: "same", updatedAt: "t1" },
+        { key: "rewritten", updatedAt: "t1" },
+        { key: "missing", updatedAt: "t1" },
+      ],
+    });
+
+    expect(deleted).toEqual(["same"]);
+    expect(await fns["state::list"]({ scope: "s" })).toEqual([{ updatedAt: "t2" }]);
+    expect(events.map((e) => [e.event_type, e.key])).toEqual([["state:deleted", "same"]]);
+    expect(store.db.isTransaction).toBe(false);
+  });
+
   it("a long run of awaited state calls lets a macrotask run before it finishes", async () => {
     const fns = stateFunctions(store);
     await fns["state::set"]({ scope: "s", key: "k", value: { n: 0 } });
