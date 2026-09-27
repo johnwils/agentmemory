@@ -59,7 +59,7 @@ function isDeletion(operation: AuditEntry["operation"], details: Record<string, 
   if (DELETION_OPS.has(operation)) return true;
   if (details.action === "delete" || details.action === "soft-delete" || details.action === "mesh.remove") return true;
   if (details.newStatus === "discarded") return true;
-  if (typeof details.softDeleted === "number" && details.softDeleted > 0) return true;
+  if (typeof details.deleted === "number" && details.deleted > 0) return true;
   return operation === "import" && details.strategy === "replace";
 }
 

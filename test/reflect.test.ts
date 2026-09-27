@@ -384,7 +384,7 @@ describe("Reflect", () => {
       expect(after!.lastDecayedAt).toBeDefined();
     });
 
-    it("soft-deletes low-confidence unreinforced insights", async () => {
+    it("deletes low-confidence unreinforced insights", async () => {
       await kv.set("mem:insights", "ins_weak", {
         id: "ins_weak", title: "Weak", content: "Weak insight", confidence: 0.12,
         reinforcements: 0, sourceConceptCluster: [], sourceMemoryIds: [],
@@ -394,11 +394,27 @@ describe("Reflect", () => {
         decayRate: 0.05,
       });
 
-      const result = (await sdk.trigger("mem::insight-decay-sweep", {})) as { softDeleted: number };
-      expect(result.softDeleted).toBe(1);
+      const result = (await sdk.trigger("mem::insight-decay-sweep", {})) as { deleted: number };
+      expect(result.deleted).toBe(1);
 
-      const after = await kv.get<Insight>("mem:insights", "ins_weak");
-      expect(after!.deleted).toBe(true);
+      expect(await kv.get<Insight>("mem:insights", "ins_weak")).toBeNull();
+    });
+
+    it("deletes insights an earlier sweep only marked deleted", async () => {
+      await kv.set("mem:insights", "ins_tombstone", {
+        id: "ins_tombstone", title: "Tombstone", content: "Tombstone insight", confidence: 0.1,
+        reinforcements: 0, sourceConceptCluster: [], sourceMemoryIds: [],
+        sourceLessonIds: [], sourceCrystalIds: [], tags: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        decayRate: 0.05,
+        deleted: true,
+      });
+
+      const result = (await sdk.trigger("mem::insight-decay-sweep", {})) as { deleted: number };
+      expect(result.deleted).toBe(1);
+
+      expect(await kv.get<Insight>("mem:insights", "ins_tombstone")).toBeNull();
     });
   });
 });

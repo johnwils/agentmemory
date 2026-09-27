@@ -67,11 +67,11 @@ describe("AGENTMEMORY_AUDIT_STORE=off", () => {
     await recordAudit(kv, "mesh_sync", "mem::mesh-sync", ["peer_sync"], { action: "mesh.sync" });
     await recordAudit(kv, "import", "mem::import", [], { strategy: "replace", stats: { memories: 3 } });
     await recordAudit(kv, "import", "mem::import", [], { strategy: "merge", stats: { memories: 3 } });
-    // Soft deletions: a lesson decayed to deleted, an insight sweep that soft-deleted, a sketch discarded by heal.
+    // Decay deletions: a lesson decayed to deleted, an insight sweep that deleted, a sketch discarded by heal.
     await recordAudit(kv, "lesson_strengthen", "mem::lesson-decay-sweep", ["lsn_soft"], { action: "soft-delete", reason: "decay-sweep" });
     await recordAudit(kv, "lesson_strengthen", "mem::lesson-decay-sweep", ["lsn_decay"], { action: "decay", reason: "decay-sweep" });
-    await recordAudit(kv, "reflect", "mem::insight-decay-sweep", ["ins_soft"], { event: "insight.decay", decayed: 4, softDeleted: 1 });
-    await recordAudit(kv, "reflect", "mem::insight-decay-sweep", ["ins_decay"], { event: "insight.decay", decayed: 4, softDeleted: 0 });
+    await recordAudit(kv, "reflect", "mem::insight-decay-sweep", ["ins_soft"], { event: "insight.decay", decayed: 4, deleted: 1 });
+    await recordAudit(kv, "reflect", "mem::insight-decay-sweep", ["ins_decay"], { event: "insight.decay", decayed: 4, deleted: 0 });
     await recordAudit(kv, "heal", "mem::heal", ["sk_disc"], { entityType: "sketch", reason: "expired-sketch", newStatus: "discarded" });
     const text = out.join("\n");
     expect(text).not.toContain("obs_1");

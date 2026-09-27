@@ -453,13 +453,16 @@ export function registerReflectFunctions(
     async () => {
       const items = await kv.list<Insight>(KV.insights);
       let decayed = 0;
-      let softDeleted = 0;
       const now = Date.now();
       const timestamp = new Date().toISOString();
       const dirty: Insight[] = [];
+      const deletedIds: string[] = [];
 
       for (const insight of items) {
-        if (insight.deleted) continue;
+        if (insight.deleted) {
+          deletedIds.push(insight.id);
+          continue;
+        }
 
         const baseline =
           insight.lastDecayedAt ||
@@ -479,28 +482,27 @@ export function registerReflectFunctions(
           insight.updatedAt = timestamp;
 
           if (insight.confidence <= 0.1 && insight.reinforcements === 0) {
-            insight.deleted = true;
-            softDeleted++;
+            deletedIds.push(insight.id);
           } else {
             decayed++;
+            dirty.push(insight);
           }
-
-          dirty.push(insight);
         }
       }
 
       // Awaited batches, not a fan-out: N un-awaited sets run back to back on
       // the event loop under inproc (see StateKV.setMany).
       await kv.setMany(KV.insights, dirty.map((i) => ({ key: i.id, value: i })));
-      await recordAudit(kv, "reflect", "mem::insight-decay-sweep", dirty.map((i) => i.id), {
+      for (const id of deletedIds) await kv.delete(KV.insights, id);
+      await recordAudit(kv, "reflect", "mem::insight-decay-sweep", [...dirty.map((i) => i.id), ...deletedIds], {
         event: "insight.decay",
         decayed,
-        softDeleted,
+        deleted: deletedIds.length,
         total: items.length,
         timestamp,
       });
 
-      return { success: true, decayed, softDeleted, total: items.length };
+      return { success: true, decayed, deleted: deletedIds.length, total: items.length };
     },
   );
 }
