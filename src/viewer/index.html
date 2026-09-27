@@ -1545,7 +1545,7 @@
       var fMetrics = h.functionMetrics || [];
       var cb = h.circuitBreaker || null;
       var workers = snap.workers || [];
-      var failed = d.failed;
+      var failed = d.failed || {};
       function countOrDash(count, isFailed) { return isFailed ? '&ndash;' : count; }
 
       var html = '';
@@ -1566,8 +1566,8 @@
       var crystalCount = (d.crystals || []).length;
       html += '<div class="stat-card" data-action="goto-tab" data-tab="lessons" role="link" tabindex="0"><div class="label">Lessons</div><div class="value">' + countOrDash(lessonCount, failed.lessons) + '</div><div class="sub">confidence-scored</div></div>';
       html += '<div class="stat-card" data-action="goto-tab" data-tab="crystals" role="link" tabindex="0"><div class="label">Crystals</div><div class="value">' + countOrDash(crystalCount, failed.crystals) + '</div><div class="sub">action digests</div></div>';
-      html += '<div class="stat-card"><div class="label">Semantic Facts</div><div class="value">' + countOrDash(d.semanticTotal, failed.semantic) + '</div><div class="sub">consolidated</div></div>';
-      html += '<div class="stat-card"><div class="label">Insights</div><div class="value">' + countOrDash(d.insightTotal, failed.insights) + '</div><div class="sub">reflected</div></div>';
+      html += '<div class="stat-card"><div class="label">Semantic Facts</div><div class="value">' + countOrDash(d.semanticTotal || 0, failed.semantic) + '</div><div class="sub">consolidated</div></div>';
+      html += '<div class="stat-card"><div class="label">Insights</div><div class="value">' + countOrDash(d.insightTotal || 0, failed.insights) + '</div><div class="sub">reflected</div></div>';
       html += '<div class="stat-card" data-action="goto-tab" data-tab="graph" role="link" tabindex="0"><div class="label">Graph Nodes</div><div class="value">' + countOrDash(nodeCount, failed.graph) + '</div><div class="sub">' + edgeCount + ' edges</div></div>';
       html += '<div class="stat-card"><div class="label">Health</div><div class="value"><div class="health-bar"><span class="health-dot ' + dotClass + '"></span> ' + esc(healthStatus) + '</div></div>';
       html += '<div class="sub">' + esc(snap.connectionState || 'unknown') + '</div>';
