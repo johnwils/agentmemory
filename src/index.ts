@@ -8,7 +8,6 @@ import {
   loadClaudeBridgeConfig,
   loadTeamConfig,
   loadSnapshotConfig,
-  isGraphExtractionEnabled,
   isAutoCompressEnabled,
   isConsolidationEnabled,
   isContextInjectionEnabled,
@@ -69,7 +68,7 @@ import { registerAutoForgetFunction } from "./functions/auto-forget.js";
 import { registerExportImportFunction } from "./functions/export-import.js";
 import { registerEnrichFunction } from "./functions/enrich.js";
 import { registerClaudeBridgeFunction } from "./functions/claude-bridge.js";
-import { registerGraphFunction, graphWritesDisabled } from "./functions/graph.js";
+import { registerGraphFunction, graphWritesOffReason } from "./functions/graph.js";
 import { isNoopProvider } from "./providers/noop.js";
 import { registerGraphImportFunction } from "./functions/graph-import.js";
 import { registerConsolidationPipelineFunction } from "./functions/consolidation-pipeline.js";
@@ -277,9 +276,10 @@ async function main() {
 
   registerGraphFunction(sdk, kv, provider);
   registerGraphImportFunction(sdk, kv);
+  const graphOffReason = graphWritesOffReason();
   bootLog(
-    graphWritesDisabled()
-      ? `Knowledge graph: writes off (${isGraphExtractionEnabled() ? "AGENTMEMORY_GRAPH_LEG=off" : "set GRAPH_EXTRACTION_ENABLED=true to enable"})`
+    graphOffReason
+      ? `Knowledge graph: writes off (${graphOffReason})`
       : `Knowledge graph: writes on (LLM relations ${isNoopProvider(provider) ? "off, no LLM provider" : "on"})`,
   );
 

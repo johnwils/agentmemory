@@ -18,7 +18,7 @@ vi.mock("../src/logger.js", () => ({
 }));
 
 import { registerEventTriggers } from "../src/triggers/events.js";
-import { persistGraphDelta, registerGraphFunction } from "../src/functions/graph.js";
+import { graphWritesOffReason, persistGraphDelta, registerGraphFunction } from "../src/functions/graph.js";
 import { registerExportImportFunction } from "../src/functions/export-import.js";
 import { KV } from "../src/state/schema.js";
 import type { CompressedObservation } from "../src/types.js";
@@ -189,5 +189,18 @@ describe("graph write posture (graph-off fork)", () => {
     const scopes = new Set(graphWrites(kv).map(([scope]) => scope));
     expect(scopes.has(KV.graphNodes)).toBe(true);
     expect(scopes.has(KV.graphNameIndex)).toBe(true);
+  });
+
+  it.each([
+    [{ GRAPH_EXTRACTION_ENABLED: "true" }, null],
+    [{ GRAPH_EXTRACTION_ENABLED: "false" }, "GRAPH_EXTRACTION_ENABLED is not true"],
+    [{ GRAPH_EXTRACTION_ENABLED: "true", AGENTMEMORY_GRAPH_LEG: "off" }, "AGENTMEMORY_GRAPH_LEG=off"],
+    [
+      { GRAPH_EXTRACTION_ENABLED: "false", AGENTMEMORY_GRAPH_LEG: "off" },
+      "GRAPH_EXTRACTION_ENABLED is not true, AGENTMEMORY_GRAPH_LEG=off",
+    ],
+  ])("names every gate that keeps graph writes off: %o", (env, reason) => {
+    setEnv(env);
+    expect(graphWritesOffReason()).toBe(reason);
   });
 });
