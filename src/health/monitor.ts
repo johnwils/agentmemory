@@ -54,18 +54,17 @@ export function registerHealthMonitor(
     const KV_PROBE_TIMEOUT = 5000;
     let kvConnectivity: { status: string; latencyMs?: number; error?: string };
     const kvStart = performance.now();
-    try {
-      const writable = await Promise.race([
-        storeAcceptsWrite(kv, "_probe"),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("timeout")), KV_PROBE_TIMEOUT),
-        ),
-      ]);
-      if (!writable) throw new Error("kv_probe_failed");
-      kvConnectivity = { status: "ok", latencyMs: Math.round((performance.now() - kvStart) * 100) / 100 };
-    } catch {
-      kvConnectivity = { status: "error", error: "kv_probe_failed", latencyMs: Math.round((performance.now() - kvStart) * 100) / 100 };
-    }
+    let probeTimer: NodeJS.Timeout | undefined;
+    const writable = await Promise.race([
+      storeAcceptsWrite(kv, "_probe"),
+      new Promise<false>((resolve) => {
+        probeTimer = setTimeout(() => resolve(false), KV_PROBE_TIMEOUT);
+      }),
+    ]).finally(() => clearTimeout(probeTimer));
+    const latencyMs = Math.round((performance.now() - kvStart) * 100) / 100;
+    kvConnectivity = writable
+      ? { status: "ok", latencyMs }
+      : { status: "error", error: "kv_probe_failed", latencyMs };
 
     const snapshot: HealthSnapshot = {
       connectionState,
