@@ -356,6 +356,11 @@ describe("Reflect", () => {
       expect(result.insights.length).toBe(1);
       expect(result.total).toBe(2);
     });
+
+    it("reports the total after filtering", async () => {
+      const result = (await sdk.trigger("mem::insight-list", { minConfidence: 0.5 })) as { total: number };
+      expect(result.total).toBe(1);
+    });
   });
 
   describe("mem::insight-search", () => {

@@ -51,6 +51,12 @@ A narrative digest of a finished piece of tracked work: what was done, its key o
 files it touched and the Lessons it yielded.
 _Avoid_: digest, recap
 
+**Semantic Fact**:
+A standalone claim distilled by consolidation from Session Summaries across many Sessions, with
+a confidence and the Sessions it came from. Unlike a Memory, it is produced by the store, not
+saved by an Agent.
+_Avoid_: fact, knowledge
+
 **Insight**:
 A higher-order conclusion synthesized from a cluster of related Memories, Lessons and Crystals
 that share concepts in the graph. Its confidence rises when reinforced and decays when unused.
