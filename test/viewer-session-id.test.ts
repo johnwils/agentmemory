@@ -245,6 +245,27 @@ describe("viewer session rendering", () => {
     expect(html).toMatch(/Semantic Facts<\/div><div class="value">12</);
   });
 
+  it("shows dashes, not an empty store, when the sessions request failed", () => {
+    const { sandbox, getElement } = loadViewerSandbox();
+    sandbox.state.dashboard = {
+      loaded: true,
+      health: { status: "healthy", health: {} },
+      sessions: [],
+      memories: [],
+      graphStats: null,
+      recentAudit: [],
+      lessons: [],
+      crystals: [],
+      failed: { sessions: true },
+    };
+
+    sandbox.renderDashboard();
+    const html = getElement("view-dashboard").innerHTML;
+    expect(html).not.toContain("First run");
+    expect(html).toMatch(/(–|&ndash;) active/);
+    expect(html).toMatch(/~(–|&ndash;) tokens/);
+  });
+
   it("does not throw when timeline and sessions tabs receive sessions missing ids", () => {
     const { sandbox, getElement } = loadViewerSandbox();
     const sessions = [{ status: "active", observationCount: 1, startedAt: "2026-05-13T12:00:00Z" }];
