@@ -45,21 +45,20 @@ function hydrateHookEnv() {
 *      child inherits it. Capturing that child would summarize it through
 *      the same provider and recurse without bound (#149 follow-up). This
 *      skip is unconditional.
-*   2. Headless Sessions: `claude -p` (entrypoint "sdk-cli"), the TS Agent
-*      SDK ("sdk-ts") and the Python Agent SDK ("sdk-py"). These are almost
-*      always scripted batches whose summaries are noise, and a batch of
-*      thousands saturates the summarizing LLM. Set
-*      AGENTMEMORY_CAPTURE_HEADLESS=1 to capture them.
+*   2. Headless Sessions: any CLAUDE_CODE_ENTRYPOINT starting "sdk-", which
+*      today is `claude -p` ("sdk-cli"), the TS Agent SDK ("sdk-ts") and
+*      the Python Agent SDK ("sdk-py"). These are almost always scripted
+*      batches whose summaries are noise, and a batch of thousands
+*      saturates the summarizing LLM. Set AGENTMEMORY_CAPTURE_HEADLESS=1
+*      to capture them.
 *
-* Hook scripts must call shouldSkipHooks(payload) EARLY and return
-* silently when it is true.
+* Claude Code puts the entrypoint in the hook's environment, never in the
+* stdin payload.
 */
-function shouldSkipHooks(payload) {
+function shouldSkipSession() {
 	if (process.env["AGENTMEMORY_SDK_CHILD"] === "1") return true;
 	if (process.env["AGENTMEMORY_CAPTURE_HEADLESS"] === "1") return false;
-	if (!payload || typeof payload !== "object") return false;
-	const entrypoint = payload.entrypoint;
-	return typeof entrypoint === "string" && entrypoint.startsWith("sdk-");
+	return process.env["CLAUDE_CODE_ENTRYPOINT"]?.startsWith("sdk-") ?? false;
 }
 //#endregion
 //#region src/hooks/stop.ts
@@ -81,7 +80,7 @@ async function main() {
 		return;
 	}
 	if (!data || typeof data !== "object") return;
-	if (shouldSkipHooks(data)) return;
+	if (shouldSkipSession()) return;
 	const sessionId = data.session_id || data.sessionId || data.conversation_id || "unknown";
 	fetch(`${REST_URL}/agentmemory/session/end`, {
 		method: "POST",

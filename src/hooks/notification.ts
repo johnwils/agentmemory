@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { hydrateHookEnv } from "./_env.js";
-import { shouldSkipHooks } from "./sdk-guard.js";
+import { shouldSkipSession } from "./sdk-guard.js";
 import { resolveProject, hookCwd } from "./_project.js";
 
 hydrateHookEnv();
@@ -28,7 +28,7 @@ async function main() {
   }
 
   if (!data || typeof data !== "object") return;
-  if (shouldSkipHooks(data)) return;
+  if (shouldSkipSession()) return;
   const notificationType = data.notification_type ?? data.notificationType;
   if (notificationType !== "permission_prompt") return;
 

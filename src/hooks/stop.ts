@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { hydrateHookEnv } from "./_env.js";
-import { shouldSkipHooks } from "./sdk-guard.js";
+import { shouldSkipSession } from "./sdk-guard.js";
 
 hydrateHookEnv();
 
@@ -27,11 +27,7 @@ async function main() {
   }
 
   if (!data || typeof data !== "object") return;
-  if (shouldSkipHooks(data)) {
-    // Do not summarize from inside a Claude Agent SDK child session;
-    // would re-enter agent-sdk provider and loop (see sdk-guard.ts).
-    return;
-  }
+  if (shouldSkipSession()) return;
 
   const sessionId = ((data.session_id || data.sessionId || data.conversation_id) as string) || "unknown";
 

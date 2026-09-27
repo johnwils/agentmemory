@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { hydrateHookEnv } from "./_env.js";
-import { shouldSkipHooks } from "./sdk-guard.js";
+import { shouldSkipSession } from "./sdk-guard.js";
 
 hydrateHookEnv();
 
@@ -27,7 +27,7 @@ async function main() {
   }
 
   if (!data || typeof data !== "object") return;
-  if (shouldSkipHooks(data)) return;
+  if (shouldSkipSession()) return;
 
   const sessionId = ((data.session_id || data.sessionId || data.conversation_id) as string) || "unknown";
 

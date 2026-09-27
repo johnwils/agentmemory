@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { hydrateHookEnv } from "./_env.js";
-import { shouldSkipHooks } from "./sdk-guard.js";
+import { shouldSkipSession } from "./sdk-guard.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { hookCwd } from "./_project.js";
@@ -44,7 +44,7 @@ async function main() {
   }
 
   if (!data || typeof data !== "object") data = {};
-  if (shouldSkipHooks(data)) return;
+  if (shouldSkipSession()) return;
 
   const cwd =
     hookCwd(data) || process.env["AGENTMEMORY_CWD"] || process.cwd();
