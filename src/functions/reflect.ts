@@ -452,15 +452,14 @@ export function registerReflectFunctions(
   sdk.registerFunction("mem::insight-decay-sweep", 
     async () => {
       const items = await kv.list<Insight>(KV.insights);
-      let decayed = 0;
       const now = Date.now();
       const timestamp = new Date().toISOString();
       const dirty: Insight[] = [];
-      const deletedIds: string[] = [];
+      const expired: Array<{ key: string; updatedAt: string }> = [];
 
       for (const insight of items) {
         if (insight.deleted) {
-          deletedIds.push(insight.id);
+          expired.push({ key: insight.id, updatedAt: insight.updatedAt });
           continue;
         }
 
@@ -477,32 +476,32 @@ export function registerReflectFunctions(
         const newConfidence = Math.max(0.05, insight.confidence - decay);
 
         if (newConfidence !== insight.confidence) {
-          insight.confidence = Math.round(newConfidence * 1000) / 1000;
+          const confidence = Math.round(newConfidence * 1000) / 1000;
+          if (confidence <= 0.1 && insight.reinforcements === 0) {
+            expired.push({ key: insight.id, updatedAt: insight.updatedAt });
+            continue;
+          }
+          insight.confidence = confidence;
           insight.lastDecayedAt = timestamp;
           insight.updatedAt = timestamp;
-
-          if (insight.confidence <= 0.1 && insight.reinforcements === 0) {
-            deletedIds.push(insight.id);
-          } else {
-            decayed++;
-            dirty.push(insight);
-          }
+          dirty.push(insight);
         }
       }
 
       // Awaited batches, not a fan-out: N un-awaited sets run back to back on
       // the event loop under inproc (see StateKV.setMany).
       await kv.setMany(KV.insights, dirty.map((i) => ({ key: i.id, value: i })));
-      for (const id of deletedIds) await kv.delete(KV.insights, id);
+      const deletedIds = await kv.deleteManyIfUnchanged(KV.insights, expired);
       await recordAudit(kv, "reflect", "mem::insight-decay-sweep", [...dirty.map((i) => i.id), ...deletedIds], {
         event: "insight.decay",
-        decayed,
+        decayed: dirty.length,
         deleted: deletedIds.length,
+        deletedIds,
         total: items.length,
         timestamp,
       });
 
-      return { success: true, decayed, deleted: deletedIds.length, total: items.length };
+      return { success: true, decayed: dirty.length, deleted: deletedIds.length, total: items.length };
     },
   );
 }

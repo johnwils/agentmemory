@@ -70,7 +70,7 @@ describe("AGENTMEMORY_AUDIT_STORE=off", () => {
     // Decay deletions: a lesson decayed to deleted, an insight sweep that deleted, a sketch discarded by heal.
     await recordAudit(kv, "lesson_strengthen", "mem::lesson-decay-sweep", ["lsn_soft"], { action: "soft-delete", reason: "decay-sweep" });
     await recordAudit(kv, "lesson_strengthen", "mem::lesson-decay-sweep", ["lsn_decay"], { action: "decay", reason: "decay-sweep" });
-    await recordAudit(kv, "reflect", "mem::insight-decay-sweep", ["ins_soft"], { event: "insight.decay", decayed: 4, deleted: 1 });
+    await recordAudit(kv, "reflect", "mem::insight-decay-sweep", ["ins_deleted"], { event: "insight.decay", decayed: 4, deleted: 1 });
     await recordAudit(kv, "reflect", "mem::insight-decay-sweep", ["ins_decay"], { event: "insight.decay", decayed: 4, deleted: 0 });
     await recordAudit(kv, "heal", "mem::heal", ["sk_disc"], { entityType: "sketch", reason: "expired-sketch", newStatus: "discarded" });
     const text = out.join("\n");
@@ -83,7 +83,7 @@ describe("AGENTMEMORY_AUDIT_STORE=off", () => {
     expect(text).not.toContain("\"strategy\":\"merge\"");
     expect(text).toContain("lsn_soft");
     expect(text).not.toContain("lsn_decay");
-    expect(text).toContain("ins_soft");
+    expect(text).toContain("ins_deleted");
     expect(text).not.toContain("ins_decay");
     expect(text).toContain("sk_disc");
     expect(text).toContain("] audit forget ");

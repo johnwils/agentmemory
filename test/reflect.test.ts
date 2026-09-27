@@ -28,6 +28,19 @@ function mockKV() {
       return entries.length;
     },
     setManyCalls,
+    deleteManyIfUnchanged: async (
+      scope: string,
+      entries: Array<{ key: string; updatedAt: string }>,
+    ): Promise<string[]> => {
+      const deleted: string[] = [];
+      for (const { key, updatedAt } of entries) {
+        const row = store.get(scope)?.get(key) as { updatedAt?: string } | undefined;
+        if (row?.updatedAt !== updatedAt) continue;
+        store.get(scope)!.delete(key);
+        deleted.push(key);
+      }
+      return deleted;
+    },
     delete: async (scope: string, key: string): Promise<void> => {
       store.get(scope)?.delete(key);
     },
@@ -415,6 +428,52 @@ describe("Reflect", () => {
       expect(result.deleted).toBe(1);
 
       expect(await kv.get<Insight>("mem:insights", "ins_tombstone")).toBeNull();
+    });
+
+    it("keeps an Insight reflect rewrote after the sweep read it", async () => {
+      const tombstone = {
+        id: "ins_regen", title: "Regen", content: "Regen insight", confidence: 0.1,
+        reinforcements: 0, sourceConceptCluster: [], sourceMemoryIds: [],
+        sourceLessonIds: [], sourceCrystalIds: [], tags: [],
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        decayRate: 0.05,
+        deleted: true,
+      };
+      await kv.set("mem:insights", "ins_regen", tombstone);
+      const setMany = kv.setMany;
+      kv.setMany = async (scope, entries) => {
+        await kv.set("mem:insights", "ins_regen", {
+          ...tombstone, deleted: undefined, confidence: 0.6, updatedAt: new Date().toISOString(),
+        });
+        return setMany(scope, entries);
+      };
+
+      const result = (await sdk.trigger("mem::insight-decay-sweep", {})) as { deleted: number };
+      expect(result.deleted).toBe(0);
+
+      const after = await kv.get<Insight>("mem:insights", "ins_regen");
+      expect(after!.confidence).toBe(0.6);
+    });
+
+    it("names the deleted Insights in the audit apart from the decayed ones", async () => {
+      const old = new Date(Date.now() - 21 * 86400000).toISOString();
+      const base = {
+        sourceConceptCluster: [], sourceMemoryIds: [], sourceLessonIds: [], sourceCrystalIds: [],
+        tags: [], createdAt: old, updatedAt: old, decayRate: 0.05,
+      };
+      await kv.set("mem:insights", "ins_keep", {
+        ...base, id: "ins_keep", title: "Keep", content: "Keep", confidence: 0.8, reinforcements: 1,
+      });
+      await kv.set("mem:insights", "ins_drop", {
+        ...base, id: "ins_drop", title: "Drop", content: "Drop", confidence: 0.12, reinforcements: 0,
+      });
+
+      await sdk.trigger("mem::insight-decay-sweep", {});
+
+      const [entry] = await kv.list<{ targetIds: string[]; details: Record<string, unknown> }>("mem:audit");
+      expect(entry.targetIds.sort()).toEqual(["ins_drop", "ins_keep"]);
+      expect(entry.details).toMatchObject({ decayed: 1, deleted: 1, deletedIds: ["ins_drop"] });
     });
   });
 });
