@@ -1,13 +1,8 @@
 #!/usr/bin/env node
 import { hydrateHookEnv } from "./_env.js";
+import { shouldSkipSession } from "./sdk-guard.js";
 
 hydrateHookEnv();
-
-function isSdkChildContext(payload: unknown): boolean {
-  if (process.env["AGENTMEMORY_SDK_CHILD"] === "1") return true;
-  if (!payload || typeof payload !== "object") return false;
-  return (payload as { entrypoint?: unknown }).entrypoint === "sdk-ts";
-}
 
 // Pre-tool-use enrichment hook.
 //
@@ -67,7 +62,7 @@ async function main() {
   }
 
   if (!data || typeof data !== "object") return;
-  if (isSdkChildContext(data)) return;
+  if (shouldSkipSession()) return;
 
   const toolName =
     typeof data.tool_name === "string"
