@@ -1,3 +1,6 @@
+# Every text file is stored and checked out with LF. A CRLF shebang line fails with
+# "env: 'node\r'" on Linux, which is how packages/mcp/bin.mjs broke the MCP server.
+* text=auto eol=lf
 # These files are scp'd to Linux hosts or baked into containers and are executed
 # there. core.autocrlf=true on a Windows checkout would hand them CRLF endings,
 # which bash rejects with "$'\r': command not found". Pin them to LF.
