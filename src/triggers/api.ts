@@ -3253,7 +3253,7 @@ export function registerApiTriggers(
     if (denied) return denied;
     const body = req.body as Record<string, unknown>;
     if (!body?.name) return { status_code: 400, body: { error: "name is required" } };
-    const result = await sdk.trigger({ function_id: "mem::sentinel-create", payload: pickFields(req.body, ["name", "type", "config", "linkedActionIds", "expiresInMs"]) });
+    const result = await sdk.trigger({ function_id: "mem::sentinel-create", payload: pickFields(body, ["name", "type", "config", "linkedActionIds", "expiresInMs"]) });
     return { status_code: 200, body: result };
   });
   sdk.registerTrigger({ type: "http", function_id: "api::sentinel-create", config: { api_path: "/agentmemory/sentinels", http_method: "POST" } });
@@ -3263,7 +3263,7 @@ export function registerApiTriggers(
     if (denied) return denied;
     const body = req.body as Record<string, unknown>;
     if (!body?.sentinelId) return { status_code: 400, body: { error: "sentinelId is required" } };
-    const result = await sdk.trigger({ function_id: "mem::sentinel-trigger", payload: pickFields(req.body, ["sentinelId", "result"]) });
+    const result = await sdk.trigger({ function_id: "mem::sentinel-trigger", payload: pickFields(body, ["sentinelId", "result"]) });
     return { status_code: 200, body: result };
   });
   sdk.registerTrigger({ type: "http", function_id: "api::sentinel-trigger", config: { api_path: "/agentmemory/sentinels/trigger", http_method: "POST" } });
@@ -3281,7 +3281,7 @@ export function registerApiTriggers(
     if (denied) return denied;
     const body = req.body as Record<string, unknown>;
     if (!body?.sentinelId) return { status_code: 400, body: { error: "sentinelId is required" } };
-    const result = await sdk.trigger({ function_id: "mem::sentinel-cancel", payload: pickFields(req.body, ["sentinelId"]) });
+    const result = await sdk.trigger({ function_id: "mem::sentinel-cancel", payload: pickFields(body, ["sentinelId"]) });
     return { status_code: 200, body: result };
   });
   sdk.registerTrigger({ type: "http", function_id: "api::sentinel-cancel", config: { api_path: "/agentmemory/sentinels/cancel", http_method: "POST" } });
@@ -3300,7 +3300,7 @@ export function registerApiTriggers(
     if (denied) return denied;
     const body = req.body as Record<string, unknown>;
     if (!body?.title) return { status_code: 400, body: { error: "title is required" } };
-    const result = await sdk.trigger({ function_id: "mem::sketch-create", payload: pickFields(req.body, ["title", "description", "expiresInMs", "project"]) });
+    const result = await sdk.trigger({ function_id: "mem::sketch-create", payload: pickFields(body, ["title", "description", "expiresInMs", "project"]) });
     return { status_code: 200, body: result };
   });
   sdk.registerTrigger({ type: "http", function_id: "api::sketch-create", config: { api_path: "/agentmemory/sketches", http_method: "POST" } });
@@ -3310,7 +3310,7 @@ export function registerApiTriggers(
     if (denied) return denied;
     const body = req.body as Record<string, unknown>;
     if (!body?.sketchId || !body?.title) return { status_code: 400, body: { error: "sketchId and title are required" } };
-    const result = await sdk.trigger({ function_id: "mem::sketch-add", payload: pickFields(req.body, ["sketchId", "title", "description", "priority", "dependsOn"]) });
+    const result = await sdk.trigger({ function_id: "mem::sketch-add", payload: pickFields(body, ["sketchId", "title", "description", "priority", "dependsOn"]) });
     return { status_code: 200, body: result };
   });
   sdk.registerTrigger({ type: "http", function_id: "api::sketch-add", config: { api_path: "/agentmemory/sketches/add", http_method: "POST" } });
@@ -3320,7 +3320,7 @@ export function registerApiTriggers(
     if (denied) return denied;
     const body = req.body as Record<string, unknown>;
     if (!body?.sketchId) return { status_code: 400, body: { error: "sketchId is required" } };
-    const result = await sdk.trigger({ function_id: "mem::sketch-promote", payload: pickFields(req.body, ["sketchId", "project"]) });
+    const result = await sdk.trigger({ function_id: "mem::sketch-promote", payload: pickFields(body, ["sketchId", "project"]) });
     return { status_code: 200, body: result };
   });
   sdk.registerTrigger({ type: "http", function_id: "api::sketch-promote", config: { api_path: "/agentmemory/sketches/promote", http_method: "POST" } });
@@ -3330,7 +3330,7 @@ export function registerApiTriggers(
     if (denied) return denied;
     const body = req.body as Record<string, unknown>;
     if (!body?.sketchId) return { status_code: 400, body: { error: "sketchId is required" } };
-    const result = await sdk.trigger({ function_id: "mem::sketch-discard", payload: pickFields(req.body, ["sketchId"]) });
+    const result = await sdk.trigger({ function_id: "mem::sketch-discard", payload: pickFields(body, ["sketchId"]) });
     return { status_code: 200, body: result };
   });
   sdk.registerTrigger({ type: "http", function_id: "api::sketch-discard", config: { api_path: "/agentmemory/sketches/discard", http_method: "POST" } });
@@ -3357,7 +3357,7 @@ export function registerApiTriggers(
     if (denied) return denied;
     const body = req.body as Record<string, unknown>;
     if (!body?.actionIds) return { status_code: 400, body: { error: "actionIds is required" } };
-    const result = await sdk.trigger({ function_id: "mem::crystallize", payload: pickFields(req.body, ["actionIds", "sessionId", "project"]) });
+    const result = await sdk.trigger({ function_id: "mem::crystallize", payload: pickFields(body, ["actionIds", "sessionId", "project"]) });
     return { status_code: 200, body: result };
   });
   sdk.registerTrigger({ type: "http", function_id: "api::crystallize", config: { api_path: "/agentmemory/crystals/create", http_method: "POST" } });
@@ -3407,7 +3407,7 @@ export function registerApiTriggers(
     if (denied) return denied;
     const body = req.body as Record<string, unknown>;
     if (!body?.targetId || !body?.dimension || !body?.value) return { status_code: 400, body: { error: "targetId, dimension, and value are required" } };
-    const result = await sdk.trigger({ function_id: "mem::facet-tag", payload: pickFields(req.body, ["targetId", "targetType", "dimension", "value"]) });
+    const result = await sdk.trigger({ function_id: "mem::facet-tag", payload: pickFields(body, ["targetId", "targetType", "dimension", "value"]) });
     return { status_code: 200, body: result };
   });
   sdk.registerTrigger({ type: "http", function_id: "api::facet-tag", config: { api_path: "/agentmemory/facets", http_method: "POST" } });
@@ -3417,7 +3417,7 @@ export function registerApiTriggers(
     if (denied) return denied;
     const body = req.body as Record<string, unknown>;
     if (!body?.targetId || !body?.dimension) return { status_code: 400, body: { error: "targetId and dimension are required" } };
-    const result = await sdk.trigger({ function_id: "mem::facet-untag", payload: pickFields(req.body, ["targetId", "dimension", "value"]) });
+    const result = await sdk.trigger({ function_id: "mem::facet-untag", payload: pickFields(body, ["targetId", "dimension", "value"]) });
     return { status_code: 200, body: result };
   });
   sdk.registerTrigger({ type: "http", function_id: "api::facet-untag", config: { api_path: "/agentmemory/facets/remove", http_method: "POST" } });
@@ -3526,7 +3526,7 @@ export function registerApiTriggers(
     if (denied) return denied;
     const body = req.body as Record<string, unknown>;
     if (!body?.query || typeof body.query !== "string") return { status_code: 400, body: { error: "query is required" } };
-    const result = await sdk.trigger({ function_id: "mem::lesson-recall", payload: pickFields(req.body, ["query", "project", "minConfidence", "limit"]) });
+    const result = await sdk.trigger({ function_id: "mem::lesson-recall", payload: pickFields(body, ["query", "project", "minConfidence", "limit"]) });
     return { status_code: 200, body: result };
   });
   sdk.registerTrigger({ type: "http", function_id: "api::lesson-search", config: { api_path: "/agentmemory/lessons/search", http_method: "POST" } });
