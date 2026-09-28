@@ -117,6 +117,34 @@ describe("Graph Functions", () => {
     expect(edges[0].type).toBe("uses");
   });
 
+  it("graph-extract sends one bounded prompt per batch and keeps the batches that succeed", async () => {
+    const observations = Array.from({ length: 25 }, (_, i) => ({ ...testObs, id: `obs_${i}` }));
+    mockProvider.compress.mockRejectedValueOnce(new Error("timed out after 300000ms"));
+
+    const result = (await sdk.trigger("mem::graph-extract", { observations })) as {
+      success: boolean;
+      nodesAdded: number;
+    };
+
+    const prompts = mockProvider.compress.mock.calls.map((c) => String(c[1]));
+    expect(prompts.map((p) => p.match(/^\[\d+\] Type:/gm)?.length)).toEqual([10, 10, 5]);
+    expect(result.success).toBe(true);
+    expect(result.nodesAdded).toBe(4);
+  });
+
+  it("graph-extract stops sending batches once the provider's circuit breaker is open", async () => {
+    const observations = Array.from({ length: 25 }, (_, i) => ({ ...testObs, id: `obs_${i}` }));
+    mockProvider.compress.mockRejectedValueOnce(new Error("circuit_breaker_open"));
+
+    const result = (await sdk.trigger("mem::graph-extract", { observations })) as {
+      success: boolean;
+      error?: string;
+    };
+
+    expect(mockProvider.compress).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ success: false, error: "circuit_breaker_open" });
+  });
+
   it("graph-extract stamps nodes with the source observation's sessionId (#656)", async () => {
     await sdk.trigger("mem::graph-extract", { observations: [testObs] });
 

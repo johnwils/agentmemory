@@ -322,3 +322,77 @@ describe("session-stop consolidation debounce", () => {
     expect(consolidateCount).toBe(2);
   });
 });
+
+describe("event::session::stopped graph extraction watermark", () => {
+  function storeKV() {
+    const scopes = new Map<string, Map<string, unknown>>();
+    const scope = (name: string) => {
+      if (!scopes.has(name)) scopes.set(name, new Map());
+      return scopes.get(name)!;
+    };
+    return {
+      scope,
+      get: vi.fn(async (s: string, k: string) => scope(s).get(k) ?? null),
+      set: vi.fn(async (s: string, k: string, v: unknown) => {
+        scope(s).set(k, v);
+        return v;
+      }),
+      delete: vi.fn(async () => {}),
+      update: vi.fn(async (s: string, k: string, ops: Array<{ path: string; value: unknown }>) => {
+        const row = { ...(scope(s).get(k) as object) } as Record<string, unknown>;
+        for (const op of ops) row[op.path] = op.value;
+        scope(s).set(k, row);
+      }),
+      list: vi.fn(async (s: string) => [...scope(s).values()]),
+    };
+  }
+
+  function observation(id: string, timestamp: string) {
+    return { id, sessionId: "ses_1", title: id, timestamp };
+  }
+
+  function extractedIds(trigger: ReturnType<typeof vi.fn>): string[][] {
+    return trigger.mock.calls
+      .map((c) => c[0] as { function_id: string; payload: { observations: Array<{ id: string }> } })
+      .filter((c) => c.function_id === "mem::graph-extract")
+      .map((c) => c.payload.observations.map((o) => o.id));
+  }
+
+  beforeEach(() => {
+    vi.mocked(isConsolidationEnabled).mockReturnValue(false);
+    vi.mocked(isGraphExtractionEnabled).mockReturnValue(true);
+  });
+
+  it("extracts only Observations newer than the previous Session end", async () => {
+    const kv = storeKV();
+    kv.scope("mem:sessions").set("ses_1", { id: "ses_1" });
+    const obs = kv.scope("mem:obs:ses_1");
+    obs.set("a", observation("a", "2026-09-28T10:00:00.000Z"));
+    obs.set("b", observation("b", "2026-09-28T10:01:00.000Z"));
+    const { sdk, handlers, trigger } = mockSdk();
+    registerEventTriggers(sdk as never, kv as never);
+    const stopped = handlers.get("event::session::stopped")!;
+
+    await stopped({ sessionId: "ses_1" });
+    obs.set("c", observation("c", "2026-09-28T10:02:00.000Z"));
+    await stopped({ sessionId: "ses_1" });
+    await stopped({ sessionId: "ses_1" });
+
+    expect(extractedIds(trigger)).toEqual([["a", "b"], ["c"]]);
+    expect(kv.scope("mem:sessions").get("ses_1")).toMatchObject({
+      graphExtractedThrough: "2026-09-28T10:02:00.000Z",
+    });
+  });
+
+  it("does not create a Session row for an unknown Session", async () => {
+    const kv = storeKV();
+    kv.scope("mem:obs:ghost").set("a", observation("a", "2026-09-28T10:00:00.000Z"));
+    const { sdk, handlers, trigger } = mockSdk();
+    registerEventTriggers(sdk as never, kv as never);
+
+    await handlers.get("event::session::stopped")!({ sessionId: "ghost" });
+
+    expect(extractedIds(trigger)).toEqual([]);
+    expect(kv.update).not.toHaveBeenCalled();
+  });
+});

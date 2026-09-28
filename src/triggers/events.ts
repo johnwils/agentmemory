@@ -113,14 +113,30 @@ export function registerEventTriggers(sdk: ISdk, kv: StateKV): void {
     // lets mem::graph-extract gate only its LLM pass, so a keyless install
     // grows the graph from every session stop. Here the whole fan-out needs
     // the extraction flag AND the graph leg not killed (AGENTMEMORY_GRAPH_LEG).
+    //
+    // A Session ends at every idle gap, so extraction takes only the
+    // Observations newer than the Session's watermark. The watermark moves
+    // before extraction runs: a batch that fails is not retried on the next
+    // end, and POST /agentmemory/graph/build remains the way to backfill it.
     if (isGraphExtractionEnabled() && !graphLegDisabled()) {
       try {
-        const observations = await kv.list<CompressedObservation>(
-          KV.observations(data.sessionId),
+        const [session, observations] = await Promise.all([
+          kv.get<Session>(KV.sessions, data.sessionId),
+          kv.list<CompressedObservation>(KV.observations(data.sessionId)),
+        ]);
+        const extractedThrough = session?.graphExtractedThrough ?? "";
+        const fresh = observations.filter(
+          (o) => o.title && o.timestamp > extractedThrough,
         );
-        const compressed = observations.filter((o) => o.title);
-        if (compressed.length > 0) {
-          fireVoid("mem::graph-extract", { observations: compressed });
+        if (session && fresh.length > 0) {
+          const latest = fresh.reduce(
+            (max, o) => (o.timestamp > max ? o.timestamp : max),
+            extractedThrough,
+          );
+          await kv.update(KV.sessions, data.sessionId, [
+            { type: "set", path: "graphExtractedThrough", value: latest },
+          ]);
+          fireVoid("mem::graph-extract", { observations: fresh });
         }
       } catch (err) {
         logger.warn("graph-extract trigger failed", {

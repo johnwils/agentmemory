@@ -28,7 +28,7 @@ import {
   GRAPH_EXTRACTION_SYSTEM,
   buildGraphExtractionPrompt,
 } from "../prompts/graph-extraction.js";
-import { isGraphExtractionEnabled } from "../config.js";
+import { getGraphBatchSize, isGraphExtractionEnabled } from "../config.js";
 import { isNoopProvider } from "../providers/noop.js";
 import { capSourceIds } from "./graph-provenance.js";
 import { recordAudit } from "./audit.js";
@@ -934,33 +934,47 @@ export function registerGraphFunction(
         isGraphExtractionEnabled() && !isNoopProvider(provider);
       let llmError: string | undefined;
       if (llmEnabled) {
-        const prompt = buildGraphExtractionPrompt(
-          data.observations.map((o) => ({
-            title: o.title,
-            narrative: o.narrative,
-            concepts: o.concepts,
-            files: o.files,
-            type: o.type,
-          })),
-        );
-        try {
-          const response = await provider.compress(
-            GRAPH_EXTRACTION_SYSTEM,
-            prompt,
+        // Map each source observation to its session so extracted nodes
+        // can be resolved back to KV.observations(sessionId) at retrieval
+        // time (#656). Skip blanks defensively.
+        const sessionByObsId = new Map<string, string>();
+        for (const o of data.observations) {
+          if (o.sessionId) sessionByObsId.set(o.id, o.sessionId);
+        }
+        // One prompt per batch bounds its size: a whole long Session in one
+        // prompt ran past the LLM timeout mid-prefill.
+        const batchSize = Math.max(1, getGraphBatchSize());
+        for (let i = 0; i < data.observations.length; i += batchSize) {
+          const batch = data.observations.slice(i, i + batchSize);
+          const prompt = buildGraphExtractionPrompt(
+            batch.map((o) => ({
+              title: o.title,
+              narrative: o.narrative,
+              concepts: o.concepts,
+              files: o.files,
+              type: o.type,
+            })),
           );
-          // Map each source observation to its session so extracted nodes
-          // can be resolved back to KV.observations(sessionId) at retrieval
-          // time (#656). Skip blanks defensively.
-          const sessionByObsId = new Map<string, string>();
-          for (const o of data.observations) {
-            if (o.sessionId) sessionByObsId.set(o.id, o.sessionId);
+          try {
+            const response = await provider.compress(
+              GRAPH_EXTRACTION_SYSTEM,
+              prompt,
+            );
+            const parsed = parseGraphXml(
+              response,
+              batch.map((o) => o.id),
+              sessionByObsId,
+            );
+            nodes = nodes.concat(parsed.nodes);
+            edges = edges.concat(parsed.edges);
+          } catch (err) {
+            llmError = err instanceof Error ? err.message : String(err);
+            logger.error("LLM graph extraction failed", {
+              error: llmError,
+              batchSize: batch.length,
+            });
+            if (llmError === "circuit_breaker_open") break;
           }
-          const parsed = parseGraphXml(response, obsIds, sessionByObsId);
-          nodes = nodes.concat(parsed.nodes);
-          edges = edges.concat(parsed.edges);
-        } catch (err) {
-          llmError = err instanceof Error ? err.message : String(err);
-          logger.error("LLM graph extraction failed", { error: llmError });
         }
       }
 
