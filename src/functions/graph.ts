@@ -1057,6 +1057,7 @@ async function advanceGraphWatermark(
   while (splitsTie()) through--;
 
   let failures = 0;
+  const skipFrom = through;
   let skipping = false;
   if (progress.failure !== undefined) {
     const counted = isProviderDown(progress.failure) ? 0 : 1;
@@ -1071,7 +1072,7 @@ async function advanceGraphWatermark(
   if (skipping) {
     logger.warn("Skipping a graph batch that keeps failing", {
       sessionId,
-      observations: observations.slice(progress.extracted, through).map((o) => o.id),
+      observations: observations.slice(skipFrom, through).map((o) => o.id),
     });
   }
 

@@ -261,6 +261,10 @@ describe("Graph Functions", () => {
         graphExtractedThrough: tied[10]!.timestamp,
         graphExtractFailures: 0,
       });
+      expect(logger.warn).toHaveBeenCalledWith(
+        "Skipping a graph batch that keeps failing",
+        expect.objectContaining({ observations: tied.slice(0, 11).map((o) => o.id) }),
+      );
     });
 
     it("skips a Session whose extraction is still running", async () => {
