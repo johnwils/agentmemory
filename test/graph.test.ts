@@ -246,6 +246,23 @@ describe("Graph Functions", () => {
       });
     });
 
+    it("still skips a failing batch when the batch before it shares its timestamp", async () => {
+      const tied = observations.map((o, i) =>
+        i <= 10 ? { ...o, timestamp: observations[0]!.timestamp } : o,
+      );
+      for (let i = 0; i < 3; i++) {
+        mockProvider.compress
+          .mockResolvedValueOnce("<entities></entities>")
+          .mockRejectedValueOnce(new Error("timed out after 300000ms"));
+        await extract(tied);
+      }
+
+      expect(await session()).toMatchObject({
+        graphExtractedThrough: tied[10]!.timestamp,
+        graphExtractFailures: 0,
+      });
+    });
+
     it("skips a Session whose extraction is still running", async () => {
       let release!: (xml: string) => void;
       mockProvider.compress.mockReturnValueOnce(new Promise((r) => (release = r)));

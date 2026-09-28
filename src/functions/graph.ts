@@ -1047,7 +1047,15 @@ async function advanceGraphWatermark(
   const session = await kv.get<Session>(KV.sessions, sessionId);
   if (!session) return;
 
+  // The next stop takes only Observations after the watermark's timestamp,
+  // so the watermark must not fall between two that share one.
   let through = progress.extracted;
+  const splitsTie = () =>
+    through > 0 &&
+    through < observations.length &&
+    observations[through - 1]!.timestamp === observations[through]!.timestamp;
+  while (splitsTie()) through--;
+
   let failures = 0;
   let skipping = false;
   if (progress.failure !== undefined) {
@@ -1055,17 +1063,11 @@ async function advanceGraphWatermark(
     failures = through > 0 ? counted : (session.graphExtractFailures ?? 0) + counted;
     if (failures >= GRAPH_BATCH_MAX_FAILURES) {
       through = Math.min(observations.length, through + batchSize);
+      while (splitsTie()) through++;
       failures = 0;
       skipping = true;
     }
   }
-  // The next stop takes only Observations after the watermark's timestamp,
-  // so the watermark must not fall between two that share one.
-  const splitsTie = () =>
-    through > 0 &&
-    through < observations.length &&
-    observations[through - 1]!.timestamp === observations[through]!.timestamp;
-  while (splitsTie()) through += skipping ? 1 : -1;
   if (skipping) {
     logger.warn("Skipping a graph batch that keeps failing", {
       sessionId,
