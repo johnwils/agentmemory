@@ -115,9 +115,11 @@ export function registerEventTriggers(sdk: ISdk, kv: StateKV): void {
     // the extraction flag AND the graph leg not killed (AGENTMEMORY_GRAPH_LEG).
     //
     // A Session ends at every idle gap, so extraction takes only the
-    // Observations newer than the Session's watermark. The watermark moves
-    // before extraction runs: a batch that fails is not retried on the next
-    // end, and POST /agentmemory/graph/build remains the way to backfill it.
+    // Observations newer than the Session's watermark. It stops short of the
+    // oldest one still awaiting compression, which keeps its timestamp once
+    // compressed and would otherwise fall behind the watermark.
+    // mem::graph-extract moves the watermark past the batches that succeed, so
+    // a failed batch is retried at the next stop.
     if (isGraphExtractionEnabled() && !graphLegDisabled()) {
       try {
         const [session, observations] = await Promise.all([
@@ -125,18 +127,21 @@ export function registerEventTriggers(sdk: ISdk, kv: StateKV): void {
           kv.list<CompressedObservation>(KV.observations(data.sessionId)),
         ]);
         const extractedThrough = session?.graphExtractedThrough ?? "";
-        const fresh = observations.filter(
-          (o) => o.title && o.timestamp > extractedThrough,
+        const unseen = observations.filter((o) => o.timestamp > extractedThrough);
+        const oldestPending = unseen
+          .filter((o) => !o.title)
+          .reduce<string | undefined>(
+            (min, o) => (min === undefined || o.timestamp < min ? o.timestamp : min),
+            undefined,
+          );
+        const fresh = unseen.filter(
+          (o) => o.title && (oldestPending === undefined || o.timestamp < oldestPending),
         );
         if (session && fresh.length > 0) {
-          const latest = fresh.reduce(
-            (max, o) => (o.timestamp > max ? o.timestamp : max),
-            extractedThrough,
-          );
-          await kv.update(KV.sessions, data.sessionId, [
-            { type: "set", path: "graphExtractedThrough", value: latest },
-          ]);
-          fireVoid("mem::graph-extract", { observations: fresh });
+          fireVoid("mem::graph-extract", {
+            observations: fresh,
+            sessionId: data.sessionId,
+          });
         }
       } catch (err) {
         logger.warn("graph-extract trigger failed", {

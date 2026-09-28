@@ -363,25 +363,46 @@ describe("event::session::stopped graph extraction watermark", () => {
     vi.mocked(isGraphExtractionEnabled).mockReturnValue(true);
   });
 
-  it("extracts only Observations newer than the previous Session end", async () => {
+  it("sends only Observations newer than the Session's watermark, with its id", async () => {
     const kv = storeKV();
-    kv.scope("mem:sessions").set("ses_1", { id: "ses_1" });
+    kv.scope("mem:sessions").set("ses_1", {
+      id: "ses_1",
+      graphExtractedThrough: "2026-09-28T10:00:00.000Z",
+    });
     const obs = kv.scope("mem:obs:ses_1");
     obs.set("a", observation("a", "2026-09-28T10:00:00.000Z"));
     obs.set("b", observation("b", "2026-09-28T10:01:00.000Z"));
     const { sdk, handlers, trigger } = mockSdk();
     registerEventTriggers(sdk as never, kv as never);
+
+    await handlers.get("event::session::stopped")!({ sessionId: "ses_1" });
+
+    expect(extractedIds(trigger)).toEqual([["b"]]);
+    const call = trigger.mock.calls
+      .map((c) => c[0] as { function_id: string; payload: { sessionId?: string } })
+      .find((c) => c.function_id === "mem::graph-extract");
+    expect(call?.payload.sessionId).toBe("ses_1");
+    expect(kv.update).not.toHaveBeenCalled();
+  });
+
+  it("holds extraction below an Observation still awaiting compression", async () => {
+    const kv = storeKV();
+    const sessions = kv.scope("mem:sessions");
+    sessions.set("ses_1", { id: "ses_1" });
+    const obs = kv.scope("mem:obs:ses_1");
+    obs.set("a", observation("a", "2026-09-28T10:00:00.000Z"));
+    obs.set("b", { id: "b", sessionId: "ses_1", timestamp: "2026-09-28T10:01:00.000Z" });
+    obs.set("c", observation("c", "2026-09-28T10:02:00.000Z"));
+    const { sdk, handlers, trigger } = mockSdk();
+    registerEventTriggers(sdk as never, kv as never);
     const stopped = handlers.get("event::session::stopped")!;
 
     await stopped({ sessionId: "ses_1" });
-    obs.set("c", observation("c", "2026-09-28T10:02:00.000Z"));
-    await stopped({ sessionId: "ses_1" });
+    sessions.set("ses_1", { id: "ses_1", graphExtractedThrough: "2026-09-28T10:00:00.000Z" });
+    obs.set("b", observation("b", "2026-09-28T10:01:00.000Z"));
     await stopped({ sessionId: "ses_1" });
 
-    expect(extractedIds(trigger)).toEqual([["a", "b"], ["c"]]);
-    expect(kv.scope("mem:sessions").get("ses_1")).toMatchObject({
-      graphExtractedThrough: "2026-09-28T10:02:00.000Z",
-    });
+    expect(extractedIds(trigger)).toEqual([["a"], ["b", "c"]]);
   });
 
   it("does not create a Session row for an unknown Session", async () => {

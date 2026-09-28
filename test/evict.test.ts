@@ -268,6 +268,33 @@ describe("mem::evict stale sessions", () => {
     );
   });
 
+  it("keeps a stale session whose raw observations fail to compress", async () => {
+    const sessionId = "ses_compress_failed";
+    const store = storeForObservations(sessionId, [
+      makeRawObservation(sessionId),
+    ]);
+    const kv = mockKV(store);
+    kv.set = async () => {
+      throw new Error("disk full");
+    };
+    const { sdk, calls } = mockSdk();
+
+    registerEvictFunction(sdk as never, kv as never);
+
+    const result = (await sdk.trigger({
+      function_id: "mem::evict",
+      payload: {},
+    })) as { staleSessions: number };
+
+    expect(result.staleSessions).toBe(0);
+    expect(await kv.get(KV.sessions, sessionId)).toMatchObject({
+      id: sessionId,
+    });
+    expect(calls.map((call) => call.function_id)).not.toContain(
+      "event::session::stopped",
+    );
+  });
+
   it("compresses a stale session's raw observations, then recovers and evicts it", async () => {
     const sessionId = "ses_raw_only";
     const store = storeForObservations(sessionId, [

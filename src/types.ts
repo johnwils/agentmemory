@@ -13,6 +13,7 @@ export interface Session {
   commitShas?: string[];
   agentId?: string;
   graphExtractedThrough?: string;
+  graphExtractFailures?: number;
 }
 
 export interface CommitLink {

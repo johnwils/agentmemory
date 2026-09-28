@@ -163,7 +163,20 @@ export function registerEvictFunction(sdk: ISdk, kv: StateKV): void {
               const raw = observations.filter(
                 (o): o is RawObservation => !isCompressedObservation(o),
               );
-              for (const o of raw) await storeSyntheticCompression(kv, o);
+              try {
+                for (const o of raw) {
+                  await storeSyntheticCompression(kv, {
+                    ...o,
+                    sessionId: session.id,
+                  });
+                }
+              } catch (err) {
+                logger.warn("Stale session compression failed", {
+                  sessionId: session.id,
+                  error: err instanceof Error ? err.message : String(err),
+                });
+                continue;
+              }
               recovered = await recoverStaleSession(sdk, session.id);
               if (!recovered) continue;
               recoveredStaleSessions++;
