@@ -1,5 +1,8 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { handleToolCall, handleToolsList } from "../src/mcp/standalone.js";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { handleToolCall, handleToolsList, hydrateMcpEnv } from "../src/mcp/standalone.js";
 import { resetHandleForTests } from "../src/mcp/rest-proxy.js";
 import { InMemoryKV } from "../src/mcp/in-memory-kv.js";
 
@@ -471,5 +474,44 @@ describe("@agentmemory/mcp standalone — server proxy (issue #159)", () => {
     } finally {
       delete process.env["AGENTMEMORY_PROBE_TIMEOUT_MS"];
     }
+  });
+});
+
+describe("@agentmemory/mcp standalone — ~/.agentmemory/.env hydration", () => {
+  const originalHome = process.env["HOME"];
+  let sandboxHome: string;
+
+  beforeEach(() => {
+    sandboxHome = mkdtempSync(join(tmpdir(), "agentmemory-mcp-env-"));
+    process.env["HOME"] = sandboxHome;
+    mkdirSync(join(sandboxHome, ".agentmemory"));
+    writeFileSync(join(sandboxHome, ".agentmemory", ".env"), "AGENTMEMORY_SECRET=from-file\n");
+  });
+
+  afterEach(() => {
+    process.env["HOME"] = originalHome;
+    delete process.env["AGENTMEMORY_SECRET"];
+    rmSync(sandboxHome, { recursive: true, force: true });
+  });
+
+  it.each([
+    ["unset", undefined],
+    ["expanded to empty by the MCP host", ""],
+    ["an unexpanded placeholder", "${AGENTMEMORY_SECRET:-}"],
+  ])("fills the secret from the file when it is %s", (_label, value) => {
+    if (value === undefined) delete process.env["AGENTMEMORY_SECRET"];
+    else process.env["AGENTMEMORY_SECRET"] = value;
+
+    hydrateMcpEnv();
+
+    expect(process.env["AGENTMEMORY_SECRET"]).toBe("from-file");
+  });
+
+  it("keeps a real secret the MCP host passed", () => {
+    process.env["AGENTMEMORY_SECRET"] = "from-host";
+
+    hydrateMcpEnv();
+
+    expect(process.env["AGENTMEMORY_SECRET"]).toBe("from-host");
   });
 });

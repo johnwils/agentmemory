@@ -29,14 +29,16 @@ export function parseEnvFile(content: string): Record<string, string> {
   return vars;
 }
 
-export function hydrateHookEnv(): void {
-  let content: string;
+export function readEnvFile(): Record<string, string> {
   try {
-    content = readFileSync(join(homedir(), ".agentmemory", ".env"), "utf-8");
+    return parseEnvFile(readFileSync(join(homedir(), ".agentmemory", ".env"), "utf-8"));
   } catch {
-    return;
+    return {};
   }
-  for (const [key, value] of Object.entries(parseEnvFile(content))) {
+}
+
+export function hydrateHookEnv(): void {
+  for (const [key, value] of Object.entries(readEnvFile())) {
     if (process.env[key] === undefined) process.env[key] = value;
   }
 }
