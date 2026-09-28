@@ -5,6 +5,7 @@ vi.mock("../src/logger.js", () => ({
 }));
 
 import { registerObserveFunction } from "../src/functions/observe.js";
+import { logger } from "../src/logger.js";
 import { getSearchIndex } from "../src/functions/search.js";
 import { KV } from "../src/state/schema.js";
 
@@ -101,6 +102,30 @@ describe("mem::observe at MAX_OBS_PER_SESSION (PR#1174)", () => {
     expect(ids).not.toContain("older");
     expect(ids).toContain("newer");
     expect(getSearchIndex().has("older")).toBe(false);
+  });
+
+  it("warns once per Session however many evictions follow", async () => {
+    const kv = mockKV();
+    const sdk = mockSdk();
+    const sessionId = "ses_cap_warn";
+    await kv.set(KV.observations(sessionId), "seed", { ...stored("seed", 5, "2026-01-01T00:00:00Z"), sessionId });
+    registerObserveFunction(sdk as never, kv as never, undefined, 1);
+    vi.mocked(logger.warn).mockClear();
+
+    for (const file of ["a.ts", "b.ts", "c.ts"]) {
+      await sdk.trigger({
+        function_id: "mem::observe",
+        payload: {
+          sessionId,
+          hookType: "post_tool_use",
+          timestamp: "2026-05-01T00:00:00Z",
+          data: { tool_name: "Read", tool_input: { file_path: file } },
+        },
+      });
+    }
+
+    const capWarns = vi.mocked(logger.warn).mock.calls.filter((c) => String(c[0]).startsWith("Session observation cap reached"));
+    expect(capWarns).toHaveLength(1);
   });
 
   it("evicts nothing under the cap", async () => {

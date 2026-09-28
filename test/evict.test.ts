@@ -268,30 +268,29 @@ describe("mem::evict stale sessions", () => {
     );
   });
 
-  it("keeps a stale session that only has raw observations", async () => {
+  it("compresses a stale session's raw observations, then recovers and evicts it", async () => {
     const sessionId = "ses_raw_only";
     const store = storeForObservations(sessionId, [
       makeRawObservation(sessionId),
     ]);
     const kv = mockKV(store);
-    const { sdk, calls } = mockSdk();
+    const { sdk } = mockSdk();
 
     registerEvictFunction(sdk as never, kv as never);
-    sdk.registerFunction("event::session::stopped", () => ({
-      success: true,
-    }));
+    sdk.registerFunction("event::session::stopped", async () => {
+      const [obs] = await kv.list<CompressedObservation>(KV.observations(sessionId));
+      expect(obs).toMatchObject({ id: "raw_1", title: "Edit" });
+      return { success: true };
+    });
+    sdk.registerFunction("mem::consolidate-pipeline", () => ({ success: true }));
+    sdk.registerFunction("mem::auto-crystallize", () => ({ success: true }));
 
     const result = (await sdk.trigger({
       function_id: "mem::evict",
       payload: {},
     })) as { staleSessions: number };
 
-    expect(result.staleSessions).toBe(0);
-    expect(await kv.get(KV.sessions, sessionId)).toMatchObject({
-      id: sessionId,
-    });
-    expect(calls.map((call) => call.function_id)).not.toContain(
-      "event::session::stopped",
-    );
+    expect(result.staleSessions).toBe(1);
+    expect(await kv.get(KV.sessions, sessionId)).toBeNull();
   });
 });
