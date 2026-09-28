@@ -1,0 +1,51 @@
+# Backlog
+
+Work the Operator has accepted but not yet scheduled. An item moves to a GitHub issue on
+`possiblyneal/agentmemory-sqlite` when work starts, and is deleted from here when it lands.
+
+## Identify a model fit for LLM Observation compression
+
+`AGENTMEMORY_AUTO_COMPRESS` stays off because the broker's `general` model is too slow to
+compress every Observation. Find a model that can keep up with it, then turn it on.
+
+- **Why it matters.** Synthetic compression (`src/functions/compress-synthetic.ts`) writes
+  `concepts: []`, `facts: []` and `importance: 5` on every Observation. As a result:
+  - consolidation never forms a concept group, so no Memories are made;
+  - session-start context and eviction rank Observations on a tie;
+  - the profile's importance-≥7 activity list is always empty.
+- **Evidence (2026-09-27).** `general` on the broker at `10.10.10.13:4010` took 30–165s to
+  first token per `graph-extract` batch, with no scheduler wait and no 429s. The model is
+  the bottleneck, not queueing. The volume to keep up with is roughly 500 Observations a
+  day, one LLM call each.
+- **Done when.** A model sustains that rate at `AGENTMEMORY_LLM_MAX_CONCURRENCY=2` without
+  starving Session summaries or graph extraction, and its output parses under
+  `src/prompts/compression.ts`.
+
+## Keep a stale-Session recovery sweep from starving graph extraction
+
+While eviction's stale-Session recovery runs, its Summarize chunks crowd out graph
+extraction on the broker. Give background recovery a smaller share of LLM capacity than
+work for live Sessions.
+
+- **What exists.** `ResilientProvider` (`src/providers/resilient.ts`) already caps every
+  generating call at one shared `AGENTMEMORY_LLM_MAX_CONCURRENCY` (2 on dev). The cap
+  bounds how many calls run at once, not who gets them: a recovery sweep can hold both
+  slots, and a graph batch sharing the GPU with a 50k-token Summarize chunk slows to under
+  1 token/s.
+- **Evidence (2026-09-28).** During the recovery sweep of 43 stale Sessions, the broker
+  mostly served ~50k-token prompts (`SUMMARIZE_CHUNK_TOKENS`, 2 chunks at a time). A
+  10-Observation graph batch timed out at 300 s at 16:46, while one slot was generating
+  6.6k tokens and another was prefilling a 45k-token prompt.
+- **Done when.** A recovery sweep leaves at least one slot for Session-stop work (Summarize
+  and graph extraction), for example by capping background callers at one slot, and no
+  graph batch times out during a sweep.
+
+## Merge the three env-file hydration loops
+
+`hydrateProcessEnvFromFile` (`src/config.ts`), `hydrateHookEnv` (`src/hooks/_env.ts`) and
+`hydrateMcpEnv` (`src/mcp/standalone.ts`) each parse `~/.agentmemory/.env` and fill
+`process.env`, differing only in what counts as unset. `readEnvFile()` in `_env.ts` also
+repeats `loadEnvFile()` in `config.ts` without its cache.
+
+- **Done when.** One helper, taking the "is unset" test as a parameter, serves all three,
+  and their precedence tests still pass.

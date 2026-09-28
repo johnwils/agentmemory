@@ -26,14 +26,15 @@ function parseEnvFile(content) {
 	}
 	return vars;
 }
-function hydrateHookEnv() {
-	let content;
+function readEnvFile() {
 	try {
-		content = readFileSync(join(homedir(), ".agentmemory", ".env"), "utf-8");
+		return parseEnvFile(readFileSync(join(homedir(), ".agentmemory", ".env"), "utf-8"));
 	} catch {
-		return;
+		return {};
 	}
-	for (const [key, value] of Object.entries(parseEnvFile(content))) if (process.env[key] === void 0) process.env[key] = value;
+}
+function hydrateHookEnv() {
+	for (const [key, value] of Object.entries(readEnvFile())) if (process.env[key] === void 0) process.env[key] = value;
 }
 //#endregion
 //#region src/hooks/antigravity-bridge.ts

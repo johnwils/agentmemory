@@ -1,5 +1,5 @@
 import { TriggerAction, type ISdk } from "../engine/types.js";
-import type { RawObservation, HookPayload, Origin } from "../types.js";
+import type { CompressedObservation, RawObservation, HookPayload, Origin } from "../types.js";
 
 const TOOL_HOOKS = new Set(["pre_tool_use", "post_tool_use", "post_tool_failure"]);
 import { KV, STREAM, generateId } from "../state/schema.js";
@@ -39,9 +39,33 @@ export function extractImage(d: unknown): string | undefined {
   return undefined;
 }
 
+export async function storeSyntheticCompression(
+  kv: StateKV,
+  raw: RawObservation,
+): Promise<CompressedObservation> {
+  const synthetic = buildSyntheticCompression(raw);
+  await kv.set(KV.observations(raw.sessionId), raw.id, synthetic);
+  // Stored above unconditionally; only the INDEX writes are
+  // skipped for excluded tools (retrieval echoes).
+  if (!isIndexExcluded(synthetic)) {
+    getSearchIndex().add(synthetic);
+    await vectorIndexAddGuarded(
+      synthetic.id,
+      synthetic.sessionId,
+      synthetic.title + " " + (synthetic.narrative || ""),
+      { kind: "synthetic", logId: synthetic.id },
+    );
+  }
+  return synthetic;
+}
+
 // Uncompressed rows carry no importance yet; rank them just below the
 // default so a scored row of average value outlives an unscored one.
 const UNSCORED_IMPORTANCE = 3;
+
+// Every eviction is audited; the log names each capped Session once per
+// process, since a long Session at its cap evicts on every tool call.
+const capWarnedSessions = new Set<string>();
 
 // A session at its cap still admits the newest observation: the work at the
 // end of a long session is what a later one most often needs. The least
@@ -90,7 +114,9 @@ async function evictToAdmitOne(
       sessionId,
     });
   }
-  logger.warn("Session observation cap reached; evicted least important", {
+  if (capWarnedSessions.has(sessionId)) return;
+  capWarnedSessions.add(sessionId);
+  logger.warn("Session observation cap reached; evicting least important from now on", {
     sessionId,
     cap,
     evicted,
@@ -379,23 +405,7 @@ export function registerObserveFunction(
             action: TriggerAction.Void(),
           });
         } else {
-          const synthetic = buildSyntheticCompression(raw);
-          await kv.set(
-            KV.observations(payload.sessionId),
-            obsId,
-            synthetic,
-          );
-          // Stored above unconditionally; only the INDEX writes are
-          // skipped for excluded tools (retrieval echoes).
-          if (!isIndexExcluded(synthetic)) {
-            getSearchIndex().add(synthetic);
-            await vectorIndexAddGuarded(
-              synthetic.id,
-              synthetic.sessionId,
-              synthetic.title + " " + (synthetic.narrative || ""),
-              { kind: "synthetic", logId: synthetic.id },
-            );
-          }
+          const synthetic = await storeSyntheticCompression(kv, raw);
           await sdk.trigger({
             function_id: "stream::set",
             payload: {

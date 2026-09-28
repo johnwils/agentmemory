@@ -41,11 +41,12 @@ const OBS: CompressedObservation = {
   importance: 7,
 };
 
-// Spy KV: serves the seeded observation, records every set as [scope, key].
+// Spy KV: serves the seeded Session and observation, records every set as [scope, key].
 function spyKV() {
   const store = new Map<string, Map<string, unknown>>();
   const sets: Array<[string, string]> = [];
   store.set(KV.observations(SESSION), new Map([[OBS.id, OBS]]));
+  store.set(KV.sessions, new Map([[SESSION, { id: SESSION }]]));
   return {
     sets,
     get: async <T>(scope: string, key: string): Promise<T | null> =>
