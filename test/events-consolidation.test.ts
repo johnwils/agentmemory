@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readFileSync } from "node:fs";
 
 vi.mock("../src/logger.js", () => ({
@@ -385,7 +385,12 @@ describe("event::session::stopped graph extraction watermark", () => {
     expect(kv.update).not.toHaveBeenCalled();
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("holds extraction below an Observation still awaiting compression", async () => {
+    vi.useFakeTimers({ now: new Date("2026-09-28T10:30:00.000Z"), toFake: ["Date"] });
     const kv = storeKV();
     const sessions = kv.scope("mem:sessions");
     sessions.set("ses_1", { id: "ses_1" });
@@ -403,6 +408,22 @@ describe("event::session::stopped graph extraction watermark", () => {
     await stopped({ sessionId: "ses_1" });
 
     expect(extractedIds(trigger)).toEqual([["a"], ["b", "c"]]);
+  });
+
+  it("stops holding extraction for a compression that never finished", async () => {
+    vi.useFakeTimers({ now: new Date("2026-09-28T12:00:00.000Z"), toFake: ["Date"] });
+    const kv = storeKV();
+    kv.scope("mem:sessions").set("ses_1", { id: "ses_1" });
+    const obs = kv.scope("mem:obs:ses_1");
+    obs.set("a", observation("a", "2026-09-28T10:00:00.000Z"));
+    obs.set("b", { id: "b", sessionId: "ses_1", timestamp: "2026-09-28T10:01:00.000Z" });
+    obs.set("c", observation("c", "2026-09-28T10:02:00.000Z"));
+    const { sdk, handlers, trigger } = mockSdk();
+    registerEventTriggers(sdk as never, kv as never);
+
+    await handlers.get("event::session::stopped")!({ sessionId: "ses_1" });
+
+    expect(extractedIds(trigger)).toEqual([["a", "c"]]);
   });
 
   it("does not create a Session row for an unknown Session", async () => {

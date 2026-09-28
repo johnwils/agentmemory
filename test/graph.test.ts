@@ -231,6 +231,21 @@ describe("Graph Functions", () => {
       expect((await session())?.graphExtractedThrough).toBeUndefined();
     });
 
+    it("does not leave the watermark between Observations that share a timestamp", async () => {
+      const tied = observations.map((o, i) =>
+        i === 10 ? { ...o, timestamp: observations[9]!.timestamp } : o,
+      );
+      mockProvider.compress
+        .mockResolvedValueOnce("<entities></entities>")
+        .mockRejectedValueOnce(new Error("timed out after 300000ms"));
+
+      await extract(tied);
+
+      expect(await session()).toMatchObject({
+        graphExtractedThrough: tied[8]!.timestamp,
+      });
+    });
+
     it("skips a Session whose extraction is still running", async () => {
       let release!: (xml: string) => void;
       mockProvider.compress.mockReturnValueOnce(new Promise((r) => (release = r)));

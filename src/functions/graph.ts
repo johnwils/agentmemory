@@ -924,6 +924,7 @@ async function extractGraph(
   kv: StateKV,
   provider: MemoryProvider,
   observations: CompressedObservation[],
+  batchSize: number,
   stopAtFirstFailure: boolean,
 ): Promise<GraphExtraction> {
   const obsIds = observations.map((o) => o.id);
@@ -954,7 +955,6 @@ async function extractGraph(
     }
     // One prompt per batch bounds its size: a whole long Session in one
     // prompt ran past the LLM timeout mid-prefill.
-    const batchSize = Math.max(1, getGraphBatchSize());
     for (let i = 0; i < observations.length; i += batchSize) {
       const batch = observations.slice(i, i + batchSize);
       const prompt = buildGraphExtractionPrompt(
@@ -1041,6 +1041,7 @@ async function advanceGraphWatermark(
   kv: StateKV,
   sessionId: string,
   observations: CompressedObservation[],
+  batchSize: number,
   progress: { extracted: number; failure?: unknown },
 ): Promise<void> {
   const session = await kv.get<Session>(KV.sessions, sessionId);
@@ -1048,17 +1049,28 @@ async function advanceGraphWatermark(
 
   let through = progress.extracted;
   let failures = 0;
+  let skipping = false;
   if (progress.failure !== undefined) {
     const counted = isProviderDown(progress.failure) ? 0 : 1;
     failures = through > 0 ? counted : (session.graphExtractFailures ?? 0) + counted;
     if (failures >= GRAPH_BATCH_MAX_FAILURES) {
-      through = Math.min(observations.length, through + Math.max(1, getGraphBatchSize()));
+      through = Math.min(observations.length, through + batchSize);
       failures = 0;
-      logger.warn("Skipping a graph batch that keeps failing", {
-        sessionId,
-        observations: observations.slice(progress.extracted, through).map((o) => o.id),
-      });
+      skipping = true;
     }
+  }
+  // The next stop takes only Observations after the watermark's timestamp,
+  // so the watermark must not fall between two that share one.
+  const splitsTie = () =>
+    through > 0 &&
+    through < observations.length &&
+    observations[through - 1]!.timestamp === observations[through]!.timestamp;
+  while (splitsTie()) through += skipping ? 1 : -1;
+  if (skipping) {
+    logger.warn("Skipping a graph batch that keeps failing", {
+      sessionId,
+      observations: observations.slice(progress.extracted, through).map((o) => o.id),
+    });
   }
 
   const ops: Array<{ type: "set"; path: string; value: unknown }> = [
@@ -1100,8 +1112,9 @@ export function registerGraphFunction(
       }
 
       const { sessionId } = data;
+      const batchSize = Math.max(1, getGraphBatchSize());
       if (!sessionId) {
-        return (await extractGraph(kv, provider, data.observations, false)).result;
+        return (await extractGraph(kv, provider, data.observations, batchSize, false)).result;
       }
       if (extracting.has(sessionId)) {
         return { success: true, nodesAdded: 0, edgesAdded: 0, skipped: "session-extracting" };
@@ -1111,9 +1124,15 @@ export function registerGraphFunction(
         const observations = [...data.observations].sort((a, b) =>
           a.timestamp < b.timestamp ? -1 : a.timestamp > b.timestamp ? 1 : 0,
         );
-        const { result, progress } = await extractGraph(kv, provider, observations, true);
+        const { result, progress } = await extractGraph(
+          kv,
+          provider,
+          observations,
+          batchSize,
+          true,
+        );
         if (progress) {
-          await advanceGraphWatermark(kv, sessionId, observations, progress);
+          await advanceGraphWatermark(kv, sessionId, observations, batchSize, progress);
         }
         return result;
       } finally {

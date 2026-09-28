@@ -16,6 +16,10 @@ import { logger } from "../logger.js";
 // the per-turn session-stop fan-out.
 const CONSOLIDATION_MARKER_KEY = "consolidation:lastRun";
 
+// A raw Observation older than this is taken to be a compression that never
+// finished, so it stops holding back graph extraction.
+const PENDING_COMPRESSION_HOLD_MS = 60 * 60 * 1000;
+
 async function consolidationDueUnserialized(kv: StateKV): Promise<boolean> {
   const cooldownMs = getConsolidationCooldownMs();
   if (cooldownMs <= 0) return true; // debounce disabled
@@ -117,7 +121,8 @@ export function registerEventTriggers(sdk: ISdk, kv: StateKV): void {
     // A Session ends at every idle gap, so extraction takes only the
     // Observations newer than the Session's watermark. It stops short of the
     // oldest one still awaiting compression, which keeps its timestamp once
-    // compressed and would otherwise fall behind the watermark.
+    // compressed and would otherwise fall behind the watermark, unless it has
+    // been waiting longer than PENDING_COMPRESSION_HOLD_MS.
     // mem::graph-extract moves the watermark past the batches that succeed, so
     // a failed batch is retried at the next stop.
     if (isGraphExtractionEnabled() && !graphLegDisabled()) {
@@ -128,8 +133,9 @@ export function registerEventTriggers(sdk: ISdk, kv: StateKV): void {
         ]);
         const extractedThrough = session?.graphExtractedThrough ?? "";
         const unseen = observations.filter((o) => o.timestamp > extractedThrough);
+        const holdSince = new Date(Date.now() - PENDING_COMPRESSION_HOLD_MS).toISOString();
         const oldestPending = unseen
-          .filter((o) => !o.title)
+          .filter((o) => !o.title && o.timestamp > holdSince)
           .reduce<string | undefined>(
             (min, o) => (min === undefined || o.timestamp < min ? o.timestamp : min),
             undefined,
