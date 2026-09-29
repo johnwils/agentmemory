@@ -471,7 +471,11 @@ export function registerSummarizeFunction(
           }
           logger.warn("Summary validation failed", {
             sessionId,
+            mode,
+            chunks,
             errors: validation.result.errors,
+            narrative: summary.narrative.slice(0, 200),
+            narrativeLength: summary.narrative.length,
           });
           return { success: false, error: "validation_failed" };
         }
