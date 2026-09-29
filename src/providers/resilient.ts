@@ -23,6 +23,8 @@ const SEVERITY: Record<CircuitBreakerState["state"], number> = {
 
 // One breaker per operation: a provider that cannot summarize a long
 // Session must not stop it compressing the next Observation.
+// Every prompt leaves through here, so this is also where a lone surrogate
+// from a UTF-16 cut is replaced: llama.cpp rejects the whole request over one.
 export class ResilientProvider implements MemoryProvider {
   private breakers = Object.fromEntries(
     OPERATIONS.map((op) => [op, new CircuitBreaker()]),
@@ -88,8 +90,6 @@ export class ResilientProvider implements MemoryProvider {
     }
   }
 
-  // Every prompt leaves through here, so this is where a lone surrogate from a
-  // UTF-16 cut is replaced: llama.cpp rejects the whole request over one.
   async compress(systemPrompt: string, userPrompt: string): Promise<string> {
     return this.call("compress", () =>
       this.inner.compress(systemPrompt.toWellFormed(), userPrompt.toWellFormed()),
