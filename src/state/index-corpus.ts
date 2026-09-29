@@ -36,9 +36,10 @@ export type EmbedJob = {
 // on a single doc. 16k chars ≈ 4k tokens, safely under every provider.
 const EMBED_MAX_CHARS = 16_000;
 
+// A lone surrogate, left by any cut that counts UTF-16 units, makes the
+// provider reject the whole request.
 export function clipEmbedInput(text: string): string {
-  if (text.length <= EMBED_MAX_CHARS) return text;
-  return text.slice(0, EMBED_MAX_CHARS);
+  return text.slice(0, EMBED_MAX_CHARS).toWellFormed();
 }
 
 // Fingerprint of the exact text handed to the provider. Stored on the vector

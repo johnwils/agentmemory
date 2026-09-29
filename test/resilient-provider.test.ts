@@ -203,3 +203,20 @@ describe("ResilientProvider concurrency cap", () => {
     await expect(provider.compress("s", "u")).resolves.toBe("compressed");
   });
 });
+
+describe("ResilientProvider prompt encoding", () => {
+  it("replaces a lone surrogate before the prompt reaches the provider", async () => {
+    const seen: string[] = [];
+    const provider = new ResilientProvider(
+      fakeProvider({
+        compress: async (s, u) => { seen.push(s, u); return "ok"; },
+        summarize: async (s, u) => { seen.push(s, u); return "ok"; },
+      }),
+    );
+
+    await provider.compress("sys\uD83D", "user \uDE00 tail");
+    await provider.summarize("sys", "cut mid-pair \uD83D");
+
+    expect(seen).toEqual(["sys�", "user � tail", "sys", "cut mid-pair �"]);
+  });
+});

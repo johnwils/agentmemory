@@ -38,12 +38,12 @@ export class ResilientProvider implements MemoryProvider {
   constructor(private inner: MemoryProvider) {
     this.name = `resilient(${inner.name})`;
     if (inner.countTokens) {
-      this.countTokens = (text) => inner.countTokens!(text);
+      this.countTokens = (text) => inner.countTokens!(text.toWellFormed());
     }
     if (inner.describeImage) {
       this.describeImage = (imageData, mimeType, prompt) =>
         this.call("describeImage", () =>
-          inner.describeImage!(imageData, mimeType, prompt),
+          inner.describeImage!(imageData, mimeType, prompt.toWellFormed()),
         );
     }
   }
@@ -88,12 +88,18 @@ export class ResilientProvider implements MemoryProvider {
     }
   }
 
+  // Every prompt leaves through here, so this is where a lone surrogate from a
+  // UTF-16 cut is replaced: llama.cpp rejects the whole request over one.
   async compress(systemPrompt: string, userPrompt: string): Promise<string> {
-    return this.call("compress", () => this.inner.compress(systemPrompt, userPrompt));
+    return this.call("compress", () =>
+      this.inner.compress(systemPrompt.toWellFormed(), userPrompt.toWellFormed()),
+    );
   }
 
   async summarize(systemPrompt: string, userPrompt: string): Promise<string> {
-    return this.call("summarize", () => this.inner.summarize(systemPrompt, userPrompt));
+    return this.call("summarize", () =>
+      this.inner.summarize(systemPrompt.toWellFormed(), userPrompt.toWellFormed()),
+    );
   }
 
   get circuitStates(): Record<ProviderOperation, CircuitBreakerState> {
