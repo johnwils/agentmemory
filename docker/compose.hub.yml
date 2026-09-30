@@ -1,0 +1,25 @@
+# Hub deployment (one LAN daemon replacing the iii-era /opt/agentmemory
+# stack). Proposed, not applied: the old project stays untouched as rollback.
+services:
+  agentmemory:
+    image: agentmemory-sqlite:${AGENTMEMORY_SQLITE_TAG}
+    container_name: agentmemory-sqlite
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "0.0.0.0:3111:3111"
+      - "0.0.0.0:3113:3113"
+    env_file:
+      - /opt/agentmemory/.env          # same keys/model/LLM/viewer settings as today (read-only reuse)
+    environment:
+      AGENTMEMORY_VIEWER_HOST: "0.0.0.0"   # already in .env; explicit here
+      EVICTION_ENABLED: "false"            # fork-only daily mem::evict (10k obs/project cap); keep 0.9.29 parity
+    volumes:
+      - /opt/agentmemory-sqlite/data:/data # agentmemory.sqlite + .hmac (copied from /opt/agentmemory/data/.hmac)
+    stop_grace_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
