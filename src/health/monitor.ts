@@ -1,3 +1,4 @@
+import os from "node:os";
 import { getHeapStatistics } from "node:v8";
 import type { ISdk } from "../engine/types.js";
 import type { HealthSnapshot } from "../types.js";
@@ -33,8 +34,11 @@ export function registerHealthMonitor(
     const elapsedMs = now - prevCpuTime;
     const userDelta = currentCpu.user - prevCpuUsage.user;
     const systemDelta = currentCpu.system - prevCpuUsage.system;
+    // cpuUsage() counts time on every core, so one busy core reads 100%;
+    // the thresholds mean share of the machine (#1235).
+    const cores = Math.max(1, os.availableParallelism());
     const cpuPercent =
-      elapsedMs > 0 ? ((userDelta + systemDelta) / 1000 / elapsedMs) * 100 : 0;
+      elapsedMs > 0 ? ((userDelta + systemDelta) / 1000 / elapsedMs / cores) * 100 : 0;
     prevCpuUsage = currentCpu;
     prevCpuTime = now;
 

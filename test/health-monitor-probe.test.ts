@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
+import os from "node:os";
 import { registerHealthMonitor } from "../src/health/monitor.js";
 import { KV } from "../src/state/schema.js";
 import type { HealthSnapshot } from "../src/types.js";
@@ -64,5 +65,23 @@ describe("health monitor store probe", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] });
     const snapshot = await latestAfterFirstSample(mockKV("hang"), 5000);
     expect(snapshot.kvConnectivity).toMatchObject({ status: "error", error: "kv_probe_failed" });
+  });
+});
+
+describe("health monitor CPU percent (#1235)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("reports CPU as a share of all cores, so 2 busy cores of 8 is not critical", async () => {
+    vi.spyOn(os, "availableParallelism").mockReturnValue(8);
+    vi.spyOn(process, "cpuUsage")
+      .mockReturnValueOnce({ user: 0, system: 0 })
+      .mockReturnValue({ user: 1_500_000, system: 500_000 });
+    vi.spyOn(Date, "now").mockReturnValueOnce(0).mockReturnValue(1000);
+
+    const snapshot = await latestAfterFirstSample(mockKV("ok"));
+    expect(snapshot.cpu.percent).toBe(25);
+    expect(snapshot.alerts.some((a) => a.startsWith("cpu_"))).toBe(false);
   });
 });
