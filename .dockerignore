@@ -1,0 +1,12 @@
+.git
+node_modules
+dist
+website
+assets
+benchmark
+eval
+docs
+*.log
+.env
+.env.*
+!.env.example

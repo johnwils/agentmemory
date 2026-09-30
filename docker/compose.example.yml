@@ -1,0 +1,33 @@
+# One agentmemory daemon serving a LAN. Copy next to a `.env` and a `data/`
+# directory owned by uid 1000, then `docker compose up -d`.
+#
+# Clients point AGENTMEMORY_URL at http://<host>:3111 and set
+# AGENTMEMORY_SECRET to the contents of data/.hmac.
+services:
+  agentmemory:
+    image: agentmemory-sqlite:latest
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: agentmemory
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:3111:3111" # REST + MCP (bearer secret required off loopback)
+      - "0.0.0.0:3113:3113" # viewer
+    env_file:
+      - .env
+    environment:
+      # The viewer binds off loopback only with an explicit Host allowlist;
+      # list every name clients use, e.g. "192.168.1.10:3113,hub.lan:3113".
+      AGENTMEMORY_VIEWER_HOST: "0.0.0.0"
+    volumes:
+      - ./data:/data
+    # SIGTERM closes the listeners and checkpoints the WAL. Committed writes
+    # are durable either way (synchronous=FULL); the grace period only spares
+    # in-flight requests.
+    stop_grace_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
