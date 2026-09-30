@@ -79,9 +79,11 @@ prints the commit each client is running.
   `[mcp_servers.agentmemory]` entry. It keeps one config backup,
   `~/.codex/config.toml.bak-agentmemory`. There is no `plugin/.codex-plugin/plugin.json`:
   Codex does not dispatch it.
-- **Cursor capture:** Cursor's installed plugin list does not include agentmemory, and
-  Grok also reads `~/.cursor/hooks.json`, so agentmemory hooks stay out of that file and
-  out of `~/.claude/settings.json`. Cursor is MCP only.
+- **Cursor capture:** Cursor imports the Claude Code plugin install (shown as "Imported")
+  and runs its hooks from there, so it follows the Claude plugin with no separate step.
+  In Cursor: plugin enabled, the plugin's MCP server disabled; MCP stays the single
+  `~/.cursor/mcp.json` entry. Agentmemory hooks stay out of `~/.cursor/hooks.json` and
+  `~/.claude/settings.json`, because Grok reads both.
 - Hook scripts accept Grok's camelCase fields (`toolInput`, `sessionId`, `toolName`,
   `toolResult`, `subagentType`, `agentId`, `lastAssistantMessage`, `workspaceRoot`)
   alongside Claude's and Codex's snake_case names (`session_id`, `tool_name`,
