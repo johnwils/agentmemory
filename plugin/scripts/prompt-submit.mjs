@@ -86,6 +86,7 @@ function resolveProject(cwd) {
 function hookCwd(data) {
 	if (!data || typeof data !== "object") return void 0;
 	if (typeof data.cwd === "string" && data.cwd.trim()) return data.cwd;
+	if (typeof data.workspaceRoot === "string" && data.workspaceRoot.trim()) return data.workspaceRoot.trim();
 	const roots = data.workspace_roots;
 	if (Array.isArray(roots)) {
 		for (const root of roots) if (typeof root === "string" && root.trim()) return root;

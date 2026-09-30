@@ -31,12 +31,11 @@ async function main() {
   if (shouldSkipSession()) return;
 
   const sessionId = ((data.session_id || data.sessionId || data.conversation_id) as string) || "unknown";
-  const agentId = data.agent_id || data.agentName;
-  const agentType = data.agent_type || data.agentDisplayName || data.agentName;
-  const lastMsg =
-    typeof data.last_assistant_message === "string"
-      ? data.last_assistant_message.slice(0, 4000)
-      : "";
+  const agentId = data.agent_id || data.agentId || data.agentName;
+  const agentType =
+    data.agent_type || data.subagentType || data.agentDisplayName || data.agentName;
+  const lastRaw = data.last_assistant_message ?? data.lastAssistantMessage;
+  const lastMsg = typeof lastRaw === "string" ? lastRaw.slice(0, 4000) : "";
 
   const cwd = hookCwd(data) || process.cwd();
 

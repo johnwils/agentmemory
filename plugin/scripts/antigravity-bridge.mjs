@@ -91,7 +91,7 @@ function normalizePayload(event, raw) {
 	const transcriptPath = firstString(raw["transcript_path"], raw["transcriptPath"]);
 	if (transcriptPath) out["transcript_path"] = transcriptPath;
 	if (toolCall) {
-		const args = normalizeToolArgs(asObject(toolCall["args"]) ?? asObject(toolCall["toolArgs"]));
+		const args = normalizeToolArgs(asObject(toolCall["args"]) ?? asObject(toolCall["toolInput"]) ?? asObject(toolCall["toolArgs"]));
 		const rawName = firstString(toolCall["name"], toolCall["toolName"], args["ToolName"], args["toolName"]);
 		if (rawName) {
 			out["tool_name"] = TOOL_NAME_MAP[rawName] ?? rawName;

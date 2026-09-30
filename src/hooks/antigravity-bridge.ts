@@ -105,7 +105,9 @@ export function normalizePayload(event: string, raw: Json): Json {
 
   if (toolCall) {
     const args = normalizeToolArgs(
-      asObject(toolCall["args"]) ?? asObject(toolCall["toolArgs"]),
+      asObject(toolCall["args"]) ??
+      asObject(toolCall["toolInput"]) ??
+      asObject(toolCall["toolArgs"]),
     );
     const rawName = firstString(
       toolCall["name"],

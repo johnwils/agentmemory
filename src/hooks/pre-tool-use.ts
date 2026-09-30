@@ -76,7 +76,7 @@ async function main() {
   const fileTools = ["edit", "write", "create", "read", "view", "glob", "grep"];
   if (!fileTools.includes(normalizedToolName)) return;
 
-  const rawToolInput = data.tool_input ?? data.toolArgs;
+  const rawToolInput = data.tool_input ?? data.toolInput ?? data.toolArgs;
   const toolInput =
     typeof rawToolInput === "object" &&
     rawToolInput !== null &&

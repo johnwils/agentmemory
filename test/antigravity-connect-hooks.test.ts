@@ -301,6 +301,16 @@ describe("antigravity bridge payload normalization", () => {
     expect(input["file_path"]).toBe("/repo/explicit.ts");
   });
 
+  it("reads toolInput when the tool call has no args or toolArgs", () => {
+    const out = normalizePayload("PostToolUse", {
+      conversationId: "c1",
+      toolCall: { name: "run_command", toolInput: { command: "npm test" } },
+    });
+    expect((out["tool_input"] as Record<string, unknown>)["command"]).toBe(
+      "npm test",
+    );
+  });
+
   it("passes unmapped tool names through unchanged", () => {
     const out = normalizePayload("PostToolUse", {
       toolCall: { name: "run_command", args: { CommandLine: "npm test" } },

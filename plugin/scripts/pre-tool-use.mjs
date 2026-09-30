@@ -103,7 +103,7 @@ async function main() {
 		"glob",
 		"grep"
 	].includes(normalizedToolName)) return;
-	const rawToolInput = data.tool_input ?? data.toolArgs;
+	const rawToolInput = data.tool_input ?? data.toolInput ?? data.toolArgs;
 	const toolInput = typeof rawToolInput === "object" && rawToolInput !== null && !Array.isArray(rawToolInput) ? rawToolInput : {};
 	const files = [];
 	const fileKeys = normalizedToolName === "grep" ? ["path", "file"] : [

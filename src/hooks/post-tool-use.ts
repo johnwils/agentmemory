@@ -32,7 +32,7 @@ async function main() {
 
   const sessionId = ((data.session_id || data.sessionId || data.conversation_id) as string) || "unknown";
   const toolName = data.tool_name ?? data.toolName;
-  const toolInput = data.tool_input ?? data.toolArgs;
+  const toolInput = data.tool_input ?? data.toolInput ?? data.toolArgs;
 
   const { imageData, cleanOutput } = extractImageData(toolOutput(data));
   const cwd = hookCwd(data) || process.cwd();

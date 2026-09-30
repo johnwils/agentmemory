@@ -86,6 +86,7 @@ function resolveProject(cwd) {
 function hookCwd(data) {
 	if (!data || typeof data !== "object") return void 0;
 	if (typeof data.cwd === "string" && data.cwd.trim()) return data.cwd;
+	if (typeof data.workspaceRoot === "string" && data.workspaceRoot.trim()) return data.workspaceRoot.trim();
 	const roots = data.workspace_roots;
 	if (Array.isArray(roots)) {
 		for (const root of roots) if (typeof root === "string" && root.trim()) return root;
@@ -116,7 +117,7 @@ async function main() {
 	if (shouldSkipSession()) return;
 	const sessionId = data.session_id || data.sessionId || data.conversation_id || "unknown";
 	const toolName = data.tool_name ?? data.toolName;
-	const toolInput = data.tool_input ?? data.toolArgs;
+	const toolInput = data.tool_input ?? data.toolInput ?? data.toolArgs;
 	const { imageData, cleanOutput } = extractImageData(toolOutput(data));
 	const cwd = hookCwd(data) || process.cwd();
 	fetch(`${REST_URL}/agentmemory/observe`, {

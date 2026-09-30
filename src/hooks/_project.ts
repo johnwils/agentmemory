@@ -27,6 +27,9 @@ export function resolveProject(cwd?: string): string {
 export function hookCwd(data: Record<string, unknown> | null | undefined): string | undefined {
   if (!data || typeof data !== "object") return undefined;
   if (typeof data.cwd === "string" && data.cwd.trim()) return data.cwd;
+  if (typeof data.workspaceRoot === "string" && data.workspaceRoot.trim()) {
+    return data.workspaceRoot.trim();
+  }
   const roots = data.workspace_roots;
   if (Array.isArray(roots)) {
     for (const root of roots) {

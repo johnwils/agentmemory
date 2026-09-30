@@ -37,8 +37,9 @@ async function main() {
   if (shouldSkipSession()) return;
 
   const sessionId = ((data.session_id || data.sessionId || data.conversation_id) as string) || "unknown";
-  const agentId = data.agent_id || data.agentName;
-  const agentType = data.agent_type || data.agentDisplayName || data.agentName;
+  const agentId = data.agent_id || data.agentId || data.agentName;
+  const agentType =
+    data.agent_type || data.subagentType || data.agentDisplayName || data.agentName;
 
   const cwd = hookCwd(data) || process.cwd();
 

@@ -86,6 +86,7 @@ function resolveProject(cwd) {
 function hookCwd(data) {
 	if (!data || typeof data !== "object") return void 0;
 	if (typeof data.cwd === "string" && data.cwd.trim()) return data.cwd;
+	if (typeof data.workspaceRoot === "string" && data.workspaceRoot.trim()) return data.workspaceRoot.trim();
 	const roots = data.workspace_roots;
 	if (Array.isArray(roots)) {
 		for (const root of roots) if (typeof root === "string" && root.trim()) return root;
@@ -115,9 +116,10 @@ async function main() {
 	if (!data || typeof data !== "object") return;
 	if (shouldSkipSession()) return;
 	const sessionId = data.session_id || data.sessionId || data.conversation_id || "unknown";
-	const agentId = data.agent_id || data.agentName;
-	const agentType = data.agent_type || data.agentDisplayName || data.agentName;
-	const lastMsg = typeof data.last_assistant_message === "string" ? data.last_assistant_message.slice(0, 4e3) : "";
+	const agentId = data.agent_id || data.agentId || data.agentName;
+	const agentType = data.agent_type || data.subagentType || data.agentDisplayName || data.agentName;
+	const lastRaw = data.last_assistant_message ?? data.lastAssistantMessage;
+	const lastMsg = typeof lastRaw === "string" ? lastRaw.slice(0, 4e3) : "";
 	const cwd = hookCwd(data) || process.cwd();
 	fetch(`${REST_URL}/agentmemory/observe`, {
 		method: "POST",
