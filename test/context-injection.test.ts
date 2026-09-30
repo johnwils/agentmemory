@@ -56,6 +56,9 @@ function runHook(
       resolve({ stdout, stderr, exitCode, tookMs: Date.now() - start });
     });
 
+    // The disabled path exits without reading stdin, so a write can race the
+    // exit and raise EPIPE; the result is judged from stdout and exit code.
+    child.stdin.on("error", () => {});
     child.stdin.write(stdin);
     child.stdin.end();
   });
