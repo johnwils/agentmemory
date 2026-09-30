@@ -9,11 +9,15 @@
 //   node dist/import-state-store.mjs --src ~/data/state_store.db \
 //        --out ~/data/agentmemory.sqlite [--report import-report.json]
 //        [--validate-only] [--no-fill] [--allow-slow-bm25] [--replace]
+//        [--include-graph] [--include-audit]
 //
 // Vectors are imported only when the index's embedding model (the manifest's
 // `model` tag; untagged Voyage means voyage-code-3) is the active one;
 // otherwise none are imported and the fill pass embeds everything eligible.
 // The new store is tagged with the active model either way.
+//
+// The graph and audit scopes are skipped unless named: the graph leg ships
+// off here, and the audit log restarts with the new store.
 //
 // Every check must pass before anything is published: the import writes a
 // temporary DB next to `--out`, checkpoints and closes it, runs
@@ -235,11 +239,13 @@ export function* scanJsonArrayRows(chunks: Iterable<string>): IterableIterator<s
 
 // ---------------------------------------------------------------- scopes
 
-const SKIP_EXACT = new Set(["mem:audit", "mem:health"]);
-export function isSkippedScope(scope: string): boolean {
+export type ScopeInclusion = { graph?: boolean; audit?: boolean };
+
+export function isSkippedScope(scope: string, include: ScopeInclusion = {}): boolean {
   return (
-    SKIP_EXACT.has(scope) ||
-    scope.startsWith("mem:graph:") ||
+    scope === "mem:health" ||
+    (scope === KV.audit && !include.audit) ||
+    (scope.startsWith("mem:graph:") && !include.graph) ||
     scope === DEAD_INDEX_SCOPE ||
     scope.startsWith(DEAD_INDEX_SCOPE_PREFIX)
   );
@@ -334,6 +340,7 @@ export type ImportOptions = {
   embeddingProvider?: EmbeddingProvider | null; // default: createEmbeddingProvider()
   allowSlowBm25?: boolean;
   replace?: boolean;
+  include?: ScopeInclusion;
   budgetMs?: number; // default 30_000
   log?: (line: string) => void;
 };
@@ -425,12 +432,12 @@ export async function importStateStore(opts: ImportOptions): Promise<ImportRepor
         log(`FAIL ${msg}`);
         continue;
       }
-      if (isSkippedScope(d.scope)) {
+      if (d.scope === KV.audit) report.auditDeletions = auditDeletions(d);
+      if (isSkippedScope(d.scope, opts.include)) {
         report.scopes.push({ scope: d.scope, keys: d.keys.length, bytes: d.bytes, action: "skipped" });
         report.totals.skippedScopes++;
         report.totals.skippedKeys += d.keys.length;
         log(`skip ${d.scope}  ${d.keys.length} keys  ${mib(d.bytes)} MiB`);
-        if (d.scope === "mem:audit") report.auditDeletions = auditDeletions(d);
         if (d.scope === DEAD_INDEX_SCOPE) bm25Scope = d;
         if (d.scope.startsWith(DEAD_INDEX_SCOPE_PREFIX)) indexScopeFiles.set(d.scope, path);
         continue;
@@ -815,10 +822,12 @@ async function main(): Promise<void> {
       "no-fill": { type: "boolean", default: false },
       "allow-slow-bm25": { type: "boolean", default: false },
       replace: { type: "boolean", default: false },
+      "include-graph": { type: "boolean", default: false },
+      "include-audit": { type: "boolean", default: false },
     },
   });
   if (!values.src || !values.out) {
-    console.error("usage: import-state-store --src <state_store.db dir> --out <agentmemory.sqlite> [--report file] [--validate-only] [--no-fill] [--allow-slow-bm25] [--replace]");
+    console.error("usage: import-state-store --src <state_store.db dir> --out <agentmemory.sqlite> [--report file] [--validate-only] [--no-fill] [--allow-slow-bm25] [--replace] [--include-graph] [--include-audit]");
     process.exitCode = 2;
     return;
   }
@@ -831,6 +840,7 @@ async function main(): Promise<void> {
       fill: !values["no-fill"],
       allowSlowBm25: values["allow-slow-bm25"],
       replace: values.replace,
+      include: { graph: values["include-graph"], audit: values["include-audit"] },
     });
     if (values["validate-only"]) console.log(JSON.stringify(report, null, 2));
   } catch (err) {

@@ -463,4 +463,29 @@ describe("import-state-store", () => {
     expect(storeModel()).toBeNull();
   });
 
+  // ---- opt-in scopes
+  it("imports the graph and audit scopes only when asked", async () => {
+    expect(isSkippedScope("mem:graph:nodes", { graph: true })).toBe(false);
+    expect(isSkippedScope("mem:audit", { audit: true })).toBe(false);
+    expect(isSkippedScope("mem:audit", { graph: true })).toBe(true);
+    expect(isSkippedScope("mem:index:bm25:vectors:g:00001", { graph: true, audit: true })).toBe(true);
+    expect(isSkippedScope("mem:health", { graph: true, audit: true })).toBe(true);
+
+    writeScope(src, "mem:memories", { mem_1: memory("mem_1", "a memory") });
+    writeScope(src, "mem:graph:nodes", { n1: { id: "n1" } });
+    writeScope(src, "mem:graph:edges", { e1: { id: "e1" } });
+    writeScope(src, "mem:audit", {
+      a1: { id: "a1", timestamp: "2026-09-02T00:00:00Z", operation: "forget", functionId: "mem::forget", targetIds: ["x"] },
+    });
+    const r = await importStateStore({ src, out, embeddingProvider: null, fill: false, include: { graph: true, audit: true }, log: () => {} });
+    expect(r.totals).toMatchObject({ importedScopes: 4, importedKeys: 4 });
+    expect(r.auditDeletions).toHaveLength(1);
+    const db = new DatabaseSync(out, { readOnly: true });
+    try {
+      const scopes = (db.prepare("SELECT DISTINCT scope FROM kv ORDER BY scope").all() as Array<{ scope: string }>).map((x) => x.scope);
+      expect(scopes).toEqual(["mem:audit", "mem:graph:edges", "mem:graph:nodes", "mem:memories"]);
+    } finally {
+      db.close();
+    }
+  });
 });
