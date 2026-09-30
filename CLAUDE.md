@@ -38,7 +38,7 @@ The Engine keeps the three primitives (Worker/Function/Trigger) as its internal 
   `plugin/scripts/*.mjs` — those are committed build output, and tsdown gives them mode 755 for
   their shebang. Regenerate them with `npm run build`; never hand-edit one or reset its mode.
 - **Test**: vitest (`npm test` excludes integration tests)
-- **Runtime floor**: the Engine and its packages need Node >=22.13 — `node:sqlite` is unflagged from 22.13, so anything older fails at import. CI runs 22/24/26 on ubuntu + macos; do not re-add a Node 20 leg. `integrations/filesystem-watcher` is a separate process that never imports `node:sqlite`, so its `>=20` stands.
+- **Runtime floor**: the Engine and its packages need Node >=22.13 — `node:sqlite` is unflagged from 22.13, so anything older fails at import. CI runs Node 24 on ubuntu + macos, the runtime of the hub image and the Mac clients; nothing is published, so the floor itself is not a CI leg. `integrations/filesystem-watcher` is a separate process that never imports `node:sqlite`, so its `>=20` stands.
 
 ## Consistency Rules
 
