@@ -285,6 +285,9 @@ export interface MemorySlot {
 
 export interface EmbeddingProvider {
   name: string;
+  // The model behind `name`. Vectors from two models of one provider are
+  // incomparable even at equal width, so stored vectors are tagged with it.
+  model?: string;
   dimensions: number;
   embed(text: string): Promise<Float32Array>;
   embedBatch(texts: string[]): Promise<Float32Array[]>;

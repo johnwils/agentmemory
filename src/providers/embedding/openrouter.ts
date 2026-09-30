@@ -11,7 +11,7 @@ export class OpenRouterEmbeddingProvider implements EmbeddingProvider {
   readonly name = "openrouter";
   readonly dimensions: number;
   private apiKey: string;
-  private model: string;
+  readonly model: string;
 
   constructor(apiKey?: string) {
     this.apiKey = apiKey || getEnvVar("OPENROUTER_API_KEY") || "";

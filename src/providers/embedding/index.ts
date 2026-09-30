@@ -2,7 +2,7 @@ import type { EmbeddingProvider } from "../../types.js";
 import { detectEmbeddingProvider, getEnvVar } from "../../config.js";
 import { GeminiEmbeddingProvider } from "./gemini.js";
 import { OpenAIEmbeddingProvider } from "./openai.js";
-import { VoyageEmbeddingProvider } from "./voyage.js";
+import { VOYAGE_DEFAULT_MODEL, VoyageEmbeddingProvider } from "./voyage.js";
 import { CohereEmbeddingProvider } from "./cohere.js";
 import { OpenRouterEmbeddingProvider } from "./openrouter.js";
 import { LocalEmbeddingProvider } from "./local.js";
@@ -17,6 +17,22 @@ export {
   LocalEmbeddingProvider,
   ClipEmbeddingProvider,
 };
+
+// The identity a stored vector is valid for. Two models behind one provider
+// name produce incomparable vector spaces even at equal dimensions
+// (voyage-code-3 vs voyage-code-4), so the name alone is not enough.
+export function embeddingModelId(provider: Pick<EmbeddingProvider, "name" | "model">): string {
+  return provider.model ? `${provider.name}:${provider.model}` : provider.name;
+}
+
+// The model behind an index written before indexes carried a model tag, or
+// null when that cannot be known. Voyage's model was hard-coded to
+// voyage-code-3 until VOYAGE_EMBEDDING_MODEL existed; the other providers
+// already read their model from the environment, so an untagged index of
+// theirs is taken to match the active one.
+export function untaggedModelId(providerName: string): string | null {
+  return providerName === "voyage" ? `voyage:${VOYAGE_DEFAULT_MODEL}` : null;
+}
 
 let imageEmbeddingProvider: EmbeddingProvider | null = null;
 

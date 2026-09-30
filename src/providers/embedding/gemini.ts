@@ -8,6 +8,7 @@ const API_BASE = `https://generativelanguage.googleapis.com/v1beta/${MODEL}:batc
 
 export class GeminiEmbeddingProvider implements EmbeddingProvider {
   readonly name = "gemini";
+  readonly model = MODEL;
   readonly dimensions = 768;
   private apiKey: string;
 

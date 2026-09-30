@@ -5,8 +5,11 @@ type FeatureExtractor = (
   options: { pooling: string; normalize: boolean },
 ) => Promise<{ tolist: () => number[][] }>;
 
+const MODEL = "Xenova/all-MiniLM-L6-v2";
+
 export class LocalEmbeddingProvider implements EmbeddingProvider {
   readonly name = "local";
+  readonly model = MODEL;
   readonly dimensions = 384;
   private extractor: FeatureExtractor | null = null;
 
@@ -39,7 +42,7 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
     }
     this.extractor = (await transformers.pipeline(
       "feature-extraction",
-      "Xenova/all-MiniLM-L6-v2",
+      MODEL,
       { dtype: "q8" },
     )) as FeatureExtractor;
     return this.extractor;

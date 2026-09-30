@@ -3,9 +3,11 @@ import { getEnvVar } from "../../config.js";
 import { fetchWithTimeout } from "../_fetch.js";
 
 const API_URL = "https://api.cohere.ai/v1/embed";
+const MODEL = "embed-english-v3.0";
 
 export class CohereEmbeddingProvider implements EmbeddingProvider {
   readonly name = "cohere";
+  readonly model = MODEL;
   readonly dimensions = 1024;
   private apiKey: string;
 
@@ -27,7 +29,7 @@ export class CohereEmbeddingProvider implements EmbeddingProvider {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "embed-english-v3.0",
+        model: MODEL,
         texts,
         input_type: "search_document",
       }),

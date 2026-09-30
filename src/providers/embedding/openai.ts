@@ -53,7 +53,7 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
   readonly dimensions: number;
   private apiKey: string;
   private baseUrl: string;
-  private model: string;
+  readonly model: string;
   private isAzure: boolean;
   private azureApiVersion: string;
 

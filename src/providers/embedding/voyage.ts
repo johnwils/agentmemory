@@ -4,14 +4,23 @@ import { fetchWithTimeout } from "../_fetch.js";
 
 const API_URL = "https://api.voyageai.com/v1/embeddings";
 
+// The model this provider used before VOYAGE_EMBEDDING_MODEL existed, and so
+// the model behind any Voyage index that carries no model tag.
+export const VOYAGE_DEFAULT_MODEL = "voyage-code-3";
+
+// Every Voyage model this accepts must return 1024-wide vectors by default
+// (voyage-code-3, voyage-code-4, voyage-3-large, ...); another width fails the
+// dimension guard on the first embed rather than landing in the index.
 export class VoyageEmbeddingProvider implements EmbeddingProvider {
   readonly name = "voyage";
   readonly dimensions = 1024;
+  readonly model: string;
   private apiKey: string;
 
   constructor(apiKey?: string) {
     this.apiKey = apiKey || getEnvVar("VOYAGE_API_KEY") || "";
     if (!this.apiKey) throw new Error("VOYAGE_API_KEY is required");
+    this.model = getEnvVar("VOYAGE_EMBEDDING_MODEL")?.trim() || VOYAGE_DEFAULT_MODEL;
   }
 
   async embed(text: string): Promise<Float32Array> {
@@ -27,7 +36,7 @@ export class VoyageEmbeddingProvider implements EmbeddingProvider {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "voyage-code-3",
+        model: this.model,
         input: texts,
         input_type: "document",
       }),
