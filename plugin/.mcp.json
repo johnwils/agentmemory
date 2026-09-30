@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "agentmemory": {
-      "command": "npx",
-      "args": ["-y", "@agentmemory/mcp"],
+      "command": "sh",
+      "args": ["-c", "exec \"$HOME/.agentmemory/mcp-launch.sh\""],
       "env": {
         "AGENTMEMORY_URL": "${AGENTMEMORY_URL:-http://localhost:3111}",
         "AGENTMEMORY_SECRET": "${AGENTMEMORY_SECRET:-}",

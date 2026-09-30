@@ -38,12 +38,35 @@ vectors that were still being embedded; the fill pass at boot and hourly re-embe
 ## Backups
 
 `/etc/cron.d/agentmemory-backup` runs `backup.sh` at 03:30 (log: `/var/log/agentmemory-backup.log`).
-It runs `VACUUM INTO` inside the container (one read transaction, consistent while the daemon
-writes), checks the copy with `PRAGMA quick_check`, and gzips it. About 300 MB each, growing
+It calls the daemon's `POST /agentmemory/backup`: a `VACUUM INTO` snapshot (one read transaction,
+consistent while the daemon writes) checked with `integrity_check` and row counts against the live
+store. The script gzips it and keeps the newest 7. About 300 MB each, growing
 roughly 10 MB a day.
 
 Restore: `docker compose down`, `gunzip -c backups/<file>.gz > data/agentmemory.sqlite`, delete
 `data/agentmemory.sqlite-wal` and `-shm`, `chown 1000:1000 data/agentmemory.sqlite`, `docker compose up -d`.
+
+## Clients (on the Mac)
+
+All clients run code from this repository, installed once globally under fnm's default Node:
+
+```sh
+cd ~/Documents/dev/agentmemory && git pull && npm ci && npm run build && npm pack
+npm i -g ./agentmemory-agentmemory-*.tgz && rm agentmemory-agentmemory-*.tgz
+cp clients/mcp-launch.sh ~/.agentmemory/mcp-launch.sh
+```
+
+- **MCP (Codex, Cursor, Grok, and the Claude Code plugin):** `~/.agentmemory/mcp-launch.sh` loads
+  `~/.agentmemory/.env` (`AGENTMEMORY_URL`, `AGENTMEMORY_SECRET`) and runs the installed
+  `dist/standalone.mjs` as a proxy to the hub.
+- **Claude Code hooks:** the plugin from this repository's marketplace
+  (`claude plugin marketplace add johnwils/agentmemory`, then `claude plugin install agentmemory@agentmemory`).
+  After a change here: `claude plugin marketplace update agentmemory && claude plugin update agentmemory@agentmemory`.
+- **Grok capture:** `~/Documents/dev/agentmemory-grok` runs the installed `plugin/scripts`
+  (`AGENTMEMORY_SCRIPTS_DIR` in `~/.config/agentmemory-grok/.env`). Re-run its `bin/install.mjs`
+  after switching fnm's default Node.
+
+Hook scripts skip headless sessions (`claude -p`, Agent SDK) by default.
 
 ## History
 

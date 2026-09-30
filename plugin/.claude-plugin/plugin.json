@@ -7,7 +7,7 @@
     "url": "https://github.com/rohitg00"
   },
   "license": "Apache-2.0",
-  "homepage": "https://github.com/possiblyneal/agentmemory-sqlite",
-  "repository": "https://github.com/possiblyneal/agentmemory-sqlite",
+  "homepage": "https://github.com/johnwils/agentmemory",
+  "repository": "https://github.com/johnwils/agentmemory",
   "skills": ["./skills/"]
 }
