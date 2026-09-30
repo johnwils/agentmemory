@@ -4,13 +4,10 @@ import { fileURLToPath } from "node:url";
 
 /**
  * Shared merge engine for writing agentmemory's bundled hook scripts into
- * a host's global, user-scope hooks config. Originally built as a
- * workaround for openai/codex#16430 — Codex Desktop does not dispatch
- * plugin-local `hooks.json` even though both `CodexHooks` and `PluginHooks`
- * feature flags are stable + default-enabled in
- * `codex-rs/features/src/lib.rs`. Until upstream fixes plugin-scope
- * dispatch, the same hook commands can be mirrored into the global
- * `~/.codex/hooks.json`, which is loaded reliably.
+ * a host's global, user-scope hooks config. Codex 0.159 removed the
+ * `plugin_hooks` feature (openai/codex#16430): CLI and Desktop share
+ * `~/.codex` and both dispatch `~/.codex/hooks.json`. Plugin-local
+ * hooks are not run. `clients/update-mac.sh` refreshes that file.
  *
  * The same merge logic now also backs Claude Code's `--with-hooks`
  * fallback (`~/.claude/settings.json`, #508 workaround) and Droid's

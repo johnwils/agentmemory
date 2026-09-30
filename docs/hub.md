@@ -47,17 +47,21 @@ Restore: `docker compose down`, `gunzip -c backups/<file>.gz > data/agentmemory.
 
 ## Clients (on the Mac)
 
-All clients run code from this repository, installed once globally under fnm's default Node:
+All clients run code from this repository. Update them with:
 
 ```sh
-cd ~/Documents/dev/agentmemory && git pull && npm ci && npm run build && npm pack
-npm i -g ./agentmemory-agentmemory-*.tgz && rm agentmemory-agentmemory-*.tgz
-cp clients/mcp-launch.sh ~/.agentmemory/mcp-launch.sh
+~/Documents/dev/agentmemory/clients/update-mac.sh
 ```
+
+The script pulls this checkout, runs `npm ci`, `npm run build`, and `npm pack`, then
+global-installs that tarball with fnm's default Node (the path `npm pack` prints, so a
+`ls` alias cannot expand the filename). It copies `clients/mcp-launch.sh` onto
+`~/.agentmemory/mcp-launch.sh`, reinstalls the Claude plugin, refreshes Codex hooks, and
+prints the commit each client is running.
 
 - **MCP (Codex and Cursor):** `~/.agentmemory/mcp-launch.sh` loads
   `~/.agentmemory/.env` (`AGENTMEMORY_URL`, `AGENTMEMORY_SECRET`) and runs the installed
-  `dist/standalone.mjs` as a proxy to the hub.
+  `dist/standalone.mjs` as a proxy to the hub. Each client registers that server once.
 - **Claude Code and Grok:** the plugin from this repository's marketplace
   (`claude plugin marketplace add johnwils/agentmemory`, then `claude plugin install agentmemory@agentmemory`).
   Grok discovers that install. Enable `agentmemory@agentmemory` in `~/.grok/config.toml`
@@ -65,11 +69,30 @@ cp clients/mcp-launch.sh ~/.agentmemory/mcp-launch.sh
   It runs `hooks/hooks.json` with `CLAUDE_PLUGIN_ROOT` set and attaches `.mcp.json`, which
   starts the same launcher. The plugin-root `plugin.json` leaves `hooks` and `mcpServers`
   unset; if those fields are set, Grok follows them and loads Copilot's files instead.
-  After a change here, uninstall and reinstall the plugin when the version string is unchanged:
-  `claude plugin marketplace update agentmemory`, then uninstall and install `agentmemory@agentmemory`.
+  The version string stays `0.9.29`, so the script uninstalls and reinstalls the plugin
+  after `claude plugin marketplace update agentmemory`.
+- **Codex capture:** the CLI and Desktop (Codex inside ChatGPT.app) share `~/.codex`.
+  Codex 0.159 removed the `plugin_hooks` feature, so a marketplace plugin's
+  `hooks/hooks.codex.json` does not run. The script merges that manifest into
+  `~/.codex/hooks.json` (other hooks in the file stay), points `node` at fnm's default
+  binary, and records hook trust for the commands it wrote. MCP stays the single
+  `[mcp_servers.agentmemory]` entry. A marketplace whose git source is
+  `rohitg00/agentmemory` is removed. There is no `plugin/.codex-plugin/plugin.json`:
+  Codex does not dispatch it.
+- **Cursor capture:** Cursor's installed plugin list does not include agentmemory, and
+  Grok also reads `~/.cursor/hooks.json`, so agentmemory hooks stay out of that file and
+  out of `~/.claude/settings.json`. Cursor is MCP only. The script deletes a leftover
+  `rohitg00/agentmemory` plugin cache when one is present.
 - Hook scripts accept Grok's camelCase fields (`toolInput`, `sessionId`, `toolName`,
   `toolResult`, `subagentType`, `agentId`, `lastAssistantMessage`, `workspaceRoot`)
-  alongside Claude's snake_case names.
+  alongside Claude's and Codex's snake_case names (`session_id`, `tool_name`,
+  `tool_input`, `tool_response`, `prompt`).
+
+| What changed | What to run |
+|---|---|
+| Server code (the daemon, its store, the hub image) | Redeploy on the hub. The script does not touch the hub. |
+| Client code (the MCP proxy, hook scripts, the Claude plugin) | `clients/update-mac.sh` |
+| Docs only | Nothing |
 
 Hook scripts skip headless sessions (`claude -p`, Agent SDK) by default. `grok --single` is not that skip.
 
