@@ -98,6 +98,14 @@ describe("stripPrivateData", () => {
     );
   });
 
+  it("does not redact words that merely contain sk-/rk- (#1398)", () => {
+    const input = "run task-runner-that-does-something-long and risk-report-generator-v2";
+    expect(stripPrivateData(input)).toBe(input);
+    expect(stripPrivateData("key=sk-ABCDEFGHIJKLMNOPQRSTUVWXYZabc")).toBe(
+      "key=[REDACTED_SECRET]",
+    );
+  });
+
   it("works correctly on consecutive calls (no regex statefulness)", () => {
     const input = "sk-ABCDEFGHIJKLMNOPQRSTUVWXYZabc";
     expect(stripPrivateData(input)).toBe("[REDACTED_SECRET]");
