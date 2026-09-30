@@ -15,6 +15,7 @@ services:
     environment:
       AGENTMEMORY_VIEWER_HOST: "0.0.0.0"   # already in .env; explicit here
       EVICTION_ENABLED: "false"            # fork-only daily mem::evict (10k obs/project cap); keep 0.9.29 parity
+      CONSOLIDATION_ENABLED: "false"       # fork enables it whenever an LLM key is set; 0.9.29 ran with it off
     volumes:
       - /opt/agentmemory-sqlite/data:/data # agentmemory.sqlite + .hmac (copied from /opt/agentmemory/data/.hmac)
     stop_grace_period: 60s
