@@ -56,6 +56,7 @@ jobs:
       # `npm ci` over the committed package-lock.json, so every leg installs
       # the tree the lockfile pins rather than whatever npm resolves that day.
       - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
       - run: npm run build
       - run: npm run skills:check
       - run: npm test
