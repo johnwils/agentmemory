@@ -13,6 +13,7 @@ import {
   setEmbeddingProvider,
   setInprocStores,
   setVectorIndex,
+  vectorIndexAddGuarded,
 } from "../src/functions/search.js";
 import type { Memory, CompressedObservation, EmbeddingProvider } from "../src/types.js";
 
@@ -253,6 +254,21 @@ describe("mem::index-fill-missing", () => {
     // A string where the array should be is not indexed one character at a time.
     expect(memoryEmbedJobs(memory("mem_odd", "odd", { sessionIds: "abc" as never }))[0].sessionId).toBe("memory");
     expect(memoryEmbedJobs({ ...memory("mem_x", "x"), id: 5 as never })).toEqual([]);
+  });
+
+  it("a write-time embed that failed is embedded by the next pass, not only at boot", async () => {
+    const o = observation("obs_late", "s1", "written while the provider was down");
+    state.set(KV.observations("s1"), o.id, o);
+    provider.failing = true;
+    expect(await vectorIndexAddGuarded(o.id, o.sessionId, o.title + " " + o.narrative, { kind: "observation", logId: o.id })).toBe(false);
+    expect(rows()).toEqual([]);
+
+    provider.failing = false;
+    const fill = createIndexFill(state, vectors, vi);
+    expect(await fill.run()).toMatchObject({ expected: 1, present: 0, missing: 1, embedded: 1, failed: 0 });
+    expect(rows()).toEqual([{ id: "obs_late", input_hash: embedInputHash(o.title + " " + o.narrative), hash_state: "verified" }]);
+    expect(vi.size).toBe(1);
+    expect(await fill.run()).toMatchObject({ present: 1, missing: 0, embedded: 0 });
   });
 
   it("aborts after three consecutive whole-batch failures and reports the remainder as failed", async () => {
