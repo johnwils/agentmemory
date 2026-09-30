@@ -41,30 +41,19 @@ cp "${repo}/clients/mcp-launch.sh" "${HOME}/.agentmemory/mcp-launch.sh"
 chmod +x "${HOME}/.agentmemory/mcp-launch.sh"
 
 claude plugin marketplace update agentmemory
-claude plugin uninstall agentmemory@agentmemory --scope user
+claude plugin uninstall agentmemory@agentmemory --scope user || true
 claude plugin install agentmemory@agentmemory --scope user -y
 
 codex_config="${HOME}/.codex/config.toml"
 if [[ -f "${codex_config}" ]]; then
-  backup="${codex_config}.bak-$(date +%Y%m%d%H%M%S)"
+  backup="${codex_config}.bak-agentmemory"
   cp "${codex_config}" "${backup}"
   echo "codex config backup: ${backup}"
 fi
 
-marketplace_json="$(codex plugin marketplace list --json)"
-if printf '%s' "${marketplace_json}" | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const j=JSON.parse(s); const hit=(j.marketplaces||[]).some(m=>String(m.marketplaceSource&&m.marketplaceSource.source||"").includes("rohitg00/agentmemory")); process.exit(hit?0:1)})'; then
-  codex plugin remove agentmemory@agentmemory --json || true
-  codex plugin marketplace remove agentmemory --json
-  rm -rf "${HOME}/.codex/plugins/cache/agentmemory"
-  rm -rf "${HOME}/.codex/.tmp/marketplaces/agentmemory"
-  echo "codex: removed the rohitg00/agentmemory marketplace"
-fi
 
 node --import tsx src/cli/connect/codex-user-hooks.ts --node-home "${node_home}"
 
-rm -rf "${HOME}/.cursor/plugins/cache/agentmemory"
-rm -rf "${HOME}/.cursor/plugins/marketplaces/github.com/rohitg00"
-rmdir "${HOME}/.cursor/plugins/marketplaces/github.com" 2>/dev/null || true
 
 sha="$(git rev-parse HEAD)"
 claude_sha="$(git -C "${HOME}/.claude/plugins/marketplaces/agentmemory" rev-parse HEAD)"

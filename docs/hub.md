@@ -76,13 +76,12 @@ prints the commit each client is running.
   `hooks/hooks.codex.json` does not run. The script merges that manifest into
   `~/.codex/hooks.json` (other hooks in the file stay), points `node` at fnm's default
   binary, and records hook trust for the commands it wrote. MCP stays the single
-  `[mcp_servers.agentmemory]` entry. A marketplace whose git source is
-  `rohitg00/agentmemory` is removed. There is no `plugin/.codex-plugin/plugin.json`:
+  `[mcp_servers.agentmemory]` entry. It keeps one config backup,
+  `~/.codex/config.toml.bak-agentmemory`. There is no `plugin/.codex-plugin/plugin.json`:
   Codex does not dispatch it.
 - **Cursor capture:** Cursor's installed plugin list does not include agentmemory, and
   Grok also reads `~/.cursor/hooks.json`, so agentmemory hooks stay out of that file and
-  out of `~/.claude/settings.json`. Cursor is MCP only. The script deletes a leftover
-  `rohitg00/agentmemory` plugin cache when one is present.
+  out of `~/.claude/settings.json`. Cursor is MCP only.
 - Hook scripts accept Grok's camelCase fields (`toolInput`, `sessionId`, `toolName`,
   `toolResult`, `subagentType`, `agentId`, `lastAssistantMessage`, `workspaceRoot`)
   alongside Claude's and Codex's snake_case names (`session_id`, `tool_name`,
