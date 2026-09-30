@@ -44,13 +44,16 @@ export class CircuitBreaker {
     return true;
   }
 
+  // The threshold counts consecutive failures: any success ends the run.
+  // Resetting only on the half-open probe let failures scattered between
+  // successes accumulate (the window only resets across a quiet gap), so a
+  // busy provider with an occasional 502 was tripped while healthy.
   recordSuccess(): void {
-    if (this.state === "half-open") {
-      this.state = "closed";
-      this.failures = 0;
-      this.lastFailureAt = null;
-      this.openedAt = null;
-    }
+    if (this.state === "open") return;
+    this.state = "closed";
+    this.failures = 0;
+    this.lastFailureAt = null;
+    this.openedAt = null;
   }
 
   recordFailure(): void {

@@ -98,6 +98,30 @@ describe("CircuitBreaker", () => {
     );
   });
 
+  it("a success in the closed state ends the failure run", () => {
+    const cb = new CircuitBreaker();
+    for (let i = 0; i < 10; i++) {
+      cb.recordFailure();
+      cb.recordFailure();
+      vi.advanceTimersByTime(1_000);
+      cb.recordSuccess();
+    }
+    expect(cb.getState()).toMatchObject({ state: "closed", failures: 0, lastFailureAt: null });
+    cb.recordFailure();
+    cb.recordFailure();
+    expect(cb.getState()).toMatchObject({ state: "closed", failures: 2 });
+    cb.recordFailure();
+    expect(cb.getState().state).toBe("open");
+  });
+
+  it("a success that lands while open does not close it before the probe", () => {
+    const cb = new CircuitBreaker();
+    for (let i = 0; i < 3; i++) cb.recordFailure();
+    cb.recordSuccess();
+    expect(cb.getState().state).toBe("open");
+    expect(cb.isAllowed).toBe(false);
+  });
+
   it("success in closed state is a no-op", () => {
     const cb = new CircuitBreaker();
     cb.recordSuccess();
