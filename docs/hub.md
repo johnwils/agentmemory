@@ -95,6 +95,8 @@ prints the commit each client is running.
 | Client code (the MCP proxy, hook scripts, the Claude plugin) | `clients/update-mac.sh` |
 | Docs only | Nothing |
 
+After an update, run the smoke test in `docs/smoke-test.md` in each client.
+
 Hook scripts skip headless sessions (`claude -p`, Agent SDK) by default. `grok --single` is not that skip.
 
 ## History
