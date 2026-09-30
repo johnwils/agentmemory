@@ -10,6 +10,11 @@
 //        --out ~/data/agentmemory.sqlite [--report import-report.json]
 //        [--validate-only] [--no-fill] [--allow-slow-bm25] [--replace]
 //
+// Vectors are imported only when the index's embedding model (the manifest's
+// `model` tag; untagged Voyage means voyage-code-3) is the active one;
+// otherwise none are imported and the fill pass embeds everything eligible.
+// The new store is tagged with the active model either way.
+//
 // Every check must pass before anything is published: the import writes a
 // temporary DB next to `--out`, checkpoints and closes it, runs
 // `integrity_check` on a fresh read-only connection, and only then renames it
@@ -34,7 +39,7 @@ import {
   setVectorIndex,
 } from "../functions/search.js";
 import { createIndexFill, type FillReport } from "../functions/index-fill.js";
-import { createEmbeddingProvider } from "../providers/embedding/index.js";
+import { createEmbeddingProvider, embeddingModelId, untaggedModelId } from "../providers/embedding/index.js";
 import type { EmbeddingProvider } from "../types.js";
 
 // ---------------------------------------------------------------- rkyv decoder
@@ -273,7 +278,7 @@ function digestDb(db: DatabaseSync, scope: string): string {
   })());
 }
 
-type ShardManifest = { v: 1; generation?: string; shards: Array<{ scope: string; key: string; chars: number }>; chars: number };
+type ShardManifest = { v: 1; generation?: string; model?: unknown; shards: Array<{ scope: string; key: string; chars: number }>; chars: number };
 
 function validManifest(m: unknown): m is ShardManifest {
   const x = m as ShardManifest;
@@ -302,6 +307,9 @@ export type ImportReport = {
     shards: number;
     imported: number;
     dims: number | null;
+    // The index's embedding model (null: unknown), the active one (null: no
+    // provider in the environment), and what the store was tagged with.
+    model?: { index: string | null; active: string | null; tagged: string | null; skipped: boolean };
     delta: { addedCount: number; removedCount: number; added: string[]; removed: string[] } | null;
   } | null;
   bm25: {
@@ -386,10 +394,13 @@ export async function importStateStore(opts: ImportOptions): Promise<ImportRepor
     report.files = files.length;
     if (files.length === 0) throw new Error(`no .bin files in ${opts.src}`);
 
+    let vstore: SqliteVectorStore | null = null;
     if (!opts.validateOnly) {
       state = new SqliteState(tmp);
-      new SqliteVectorStore(state); // creates the vectors table
+      vstore = new SqliteVectorStore(state); // creates the vectors table
     }
+    const provider = opts.embeddingProvider === undefined ? createEmbeddingProvider() : opts.embeddingProvider;
+    const activeModel = provider ? embeddingModelId(provider) : null;
     const db = state?.db ?? null;
     const insert = db?.prepare("INSERT INTO kv (scope, key, value, updated_at) VALUES (?, ?, ?, ?)") ?? null;
     const now = Date.now();
@@ -481,11 +492,26 @@ export async function importStateStore(opts: ImportOptions): Promise<ImportRepor
 
     let importedVectorIds: Set<string> | null = null;
     let vectorDims: number | null = null;
-    const vm = bm25Scope?.value["vectors:manifest"];
-    if (vm === undefined) {
+    const vmRaw = bm25Scope?.value["vectors:manifest"];
+    if (vmRaw !== undefined && !validManifest(vmRaw)) throw new Error("vectors:manifest is invalid");
+    const vm = vmRaw as ShardManifest | undefined;
+    const indexTag = typeof vm?.model === "string" && vm.model ? vm.model : null;
+    const indexModel = indexTag ?? (vm && provider ? untaggedModelId(provider.name) : null);
+    const storeTag = activeModel ?? indexTag;
+    const modelInfo = { index: indexModel, active: activeModel, tagged: vstore ? storeTag : null, skipped: false };
+    if (!vm) {
       warn("no vectors:manifest - no vectors imported; the fill pass will embed everything eligible");
+    } else if (activeModel && indexModel && indexModel !== activeModel) {
+      report.vectors = {
+        generation: vm.generation ?? null,
+        shards: vm.shards.length,
+        imported: 0,
+        dims: null,
+        delta: null,
+        model: { ...modelInfo, skipped: true },
+      };
+      warn(`vectors:manifest was embedded with ${indexModel}, the active model is ${activeModel}: no vectors imported; the fill pass embeds everything eligible with ${activeModel}`);
     } else {
-      if (!validManifest(vm)) throw new Error("vectors:manifest is invalid");
       const chunks = loadShards(vm, "vectors");
       importedVectorIds = new Set();
       const ins = db?.prepare(
@@ -524,9 +550,15 @@ export async function importStateStore(opts: ImportOptions): Promise<ImportRepor
         imported: importedVectorIds.size,
         dims: vectorDims,
         delta: null,
+        model: modelInfo,
       };
       log(`ok   vectors  ${importedVectorIds.size} rows from ${vm.shards.length} shards, dims ${vectorDims}`);
     }
+
+    // The store is tagged with the active model (imported vectors matched it,
+    // or none were imported); without a provider in the environment, with the
+    // index's own tag; untagged when neither is known (the daemon decides).
+    if (storeTag) vstore?.setModel(storeTag);
 
     // ---- old BM25 doc ids, for the corpus delta (acceptance, step 9.7a).
     let oldBm25Ids: Set<string> | null = null;
@@ -579,7 +611,6 @@ export async function importStateStore(opts: ImportOptions): Promise<ImportRepor
 
     // ---- fill pass (step 5) once, inside the importer.
     if (opts.fill !== false) {
-      const provider = opts.embeddingProvider === undefined ? createEmbeddingProvider() : opts.embeddingProvider;
       if (!provider) throw new Error("no embedding provider in the environment; export the daemon's env or pass --no-fill");
       if (vectorDims !== null && provider.dimensions !== vectorDims) {
         throw new Error(`imported vectors have ${vectorDims} dims, provider ${provider.name} declares ${provider.dimensions}`);

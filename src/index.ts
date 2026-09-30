@@ -24,6 +24,7 @@ import {
   createEmbeddingProvider,
   createImageEmbeddingProvider,
 } from "./providers/index.js";
+import { embeddingModelId, untaggedModelId } from "./providers/embedding/index.js";
 import { StateKV } from "./state/kv.js";
 import { KV } from "./state/schema.js";
 import { runStartupMaintenance } from "./state/startup-maintenance.js";
@@ -420,6 +421,36 @@ async function main() {
   registerMcpEndpoints(sdk, kv, secret, metricsStore);
 
   const healthMonitor = registerHealthMonitor(sdk, kv);
+
+  // Vectors of two embedding models are incomparable even at one width, so
+  // the table is held to the active model before anything is loaded from it.
+  if (vectorIndex && embeddingProvider) {
+    const r = vectorStore.reconcileModel(
+      embeddingModelId(embeddingProvider),
+      untaggedModelId(embeddingProvider.name),
+      isDropStaleIndexEnabled(),
+    );
+    if (r.action === "refuse") {
+      throw new Error(
+        `[agentmemory] Refusing to start: the ${r.rows} stored vectors were embedded ` +
+          `with ${r.stored}, but the active embedding model is ${r.active}. Serving ` +
+          `both would rank incomparable vectors against each other. Choose one:\n` +
+          `  - Switch the embedding model back to ${r.stored}.\n` +
+          `  - Set AGENTMEMORY_DROP_STALE_INDEX=true to delete the stored vectors; ` +
+          `the fill pass then re-embeds every indexed row with ${r.active} ` +
+          `(one embedding call per row - that is the cost).`,
+      );
+    }
+    if (r.action === "dropped") {
+      console.warn(
+        `[agentmemory] Deleted ${r.rows} vectors embedded with ${r.stored} ` +
+          `(AGENTMEMORY_DROP_STALE_INDEX=true); the fill pass re-embeds with ${r.active}.`,
+      );
+    } else if (r.action === "adopted") {
+      bootLog(`Vector store tagged ${r.active} (${r.rows} untagged vectors taken to match)`);
+    }
+    bootLog(`Embedding model: ${r.active}`);
+  }
 
   if (vectorIndex) {
     const hydrated = vectorStore.hydrate(vectorIndex);

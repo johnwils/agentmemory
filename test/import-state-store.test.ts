@@ -398,4 +398,69 @@ describe("import-state-store", () => {
     await expect(importStateStore({ src, out, embeddingProvider: fakeProvider(), log: () => {} })).rejects.toThrow(/duplicate keys/);
     expect(readdirSync(root)).toEqual(["state_store.db"]);
   });
+  // ---- embedding-model identity
+  function modelStore(tag?: string): void {
+    writeScope(src, "mem:obs:s1", { obs_1: observation("obs_1", "s1", "one"), obs_2: observation("obs_2", "s1", "two") });
+    const vi = new VectorIndex();
+    vi.add("obs_1", "s1", v(1, 0, 0, 0));
+    const json = vi.serialize();
+    const vs = shards(src, "mem:index:bm25:vectors:gen_m", json, []);
+    writeScope(src, "mem:index:bm25", {
+      "vectors:manifest": { v: 1, generation: "gen_m", shards: vs.scopes, chars: vs.chars, ...(tag ? { model: tag } : {}) },
+    });
+  }
+  const named = (name: string, model: string) => Object.assign(fakeProvider(), { name, model });
+  const storeModel = (): string | null => {
+    const db = new DatabaseSync(out, { readOnly: true });
+    try {
+      const row = db.prepare("SELECT value FROM vector_meta WHERE key = 'model'").get() as { value: string } | undefined;
+      return row?.value ?? null;
+    } finally {
+      db.close();
+    }
+  };
+
+  it("imports vectors whose tagged model is the active one and tags the store with it", async () => {
+    modelStore("fake:m1");
+    const provider = named("fake", "m1");
+    const r = await importStateStore({ src, out, embeddingProvider: provider, log: () => {} });
+    expect(r.vectors).toMatchObject({ imported: 1, model: { index: "fake:m1", active: "fake:m1", tagged: "fake:m1", skipped: false } });
+    expect(r.fill).toMatchObject({ present: 1, embedded: 1 });
+    expect(provider.calls.flat()).toEqual(["title obs_2 two"]);
+    expect(storeModel()).toBe("fake:m1");
+  });
+
+  it("imports no vectors from another model; the fill pass embeds everything with the active one", async () => {
+    modelStore("fake:m2");
+    const provider = named("fake", "m1");
+    const r = await importStateStore({ src, out, embeddingProvider: provider, log: () => {} });
+    expect(r.vectors).toMatchObject({ imported: 0, model: { index: "fake:m2", active: "fake:m1", tagged: "fake:m1", skipped: true } });
+    expect(r.warnings.some((w) => /embedded with fake:m2/.test(w))).toBe(true);
+    expect(r.fill).toMatchObject({ present: 0, embedded: 2 });
+    expect(r.readiness?.hydrated).toBe(2);
+    expect(storeModel()).toBe("fake:m1");
+  });
+
+  it("an untagged index is Voyage's voyage-code-3", async () => {
+    modelStore();
+    const code3 = await importStateStore({ src, out, embeddingProvider: named("voyage", "voyage-code-3"), log: () => {} });
+    expect(code3.vectors).toMatchObject({ imported: 1, model: { index: "voyage:voyage-code-3", skipped: false } });
+    rmSync(out);
+    const code4 = await importStateStore({ src, out, embeddingProvider: named("voyage", "voyage-code-4"), log: () => {} });
+    expect(code4.vectors).toMatchObject({ imported: 0, model: { index: "voyage:voyage-code-3", active: "voyage:voyage-code-4", skipped: true } });
+    expect(storeModel()).toBe("voyage:voyage-code-4");
+  });
+
+  it("without a provider keeps the index's own tag, or none when it has none", async () => {
+    modelStore("voyage:voyage-code-4");
+    const r = await importStateStore({ src, out, embeddingProvider: null, fill: false, log: () => {} });
+    expect(r.vectors).toMatchObject({ imported: 1, model: { index: "voyage:voyage-code-4", active: null, tagged: "voyage:voyage-code-4" } });
+    expect(storeModel()).toBe("voyage:voyage-code-4");
+    rmSync(out);
+    rmSync(join(root, "import-report.json"));
+    modelStore();
+    await importStateStore({ src, out, embeddingProvider: null, fill: false, log: () => {} });
+    expect(storeModel()).toBeNull();
+  });
+
 });

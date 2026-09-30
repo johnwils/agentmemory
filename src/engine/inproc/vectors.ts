@@ -11,6 +11,9 @@
 //     if that is the text this embedding was computed for. A completion for
 //     rewritten or deleted content is dropped as stale.
 //   - `hydrate` streams the rows in `seq` order into an empty index.
+//   - `vector_meta.model` names the embedding model every row was computed
+//     with (`provider:model`). `reconcileModel` holds the table to the active
+//     model at boot, so vectors of two models are never served together.
 import type { SqliteState } from "./state.js";
 import type { VectorIndex, VectorRow, VectorStore } from "../../state/vector-index.js";
 import { KV } from "../../state/schema.js";
@@ -32,7 +35,19 @@ CREATE TABLE IF NOT EXISTS vectors (
   input_hash TEXT    NOT NULL,
   hash_state TEXT    NOT NULL CHECK (hash_state IN ('verified', 'legacy'))
 );
+CREATE TABLE IF NOT EXISTS vector_meta (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
 `;
+
+export type ModelReconcile =
+  // The table is (now) tagged with the active model and may be served.
+  | { action: "match" | "tagged" | "adopted"; active: string; rows: number }
+  // The table held another model's vectors: deleted, then tagged active.
+  | { action: "dropped"; active: string; stored: string; rows: number }
+  // The table holds another model's vectors and dropping was not allowed.
+  | { action: "refuse"; active: string; stored: string; rows: number };
 
 export type StoredVector = {
   id: string;
@@ -113,6 +128,44 @@ export class SqliteVectorStore implements VectorStore {
 
   afterCommit(fn: () => void): void {
     this.state.afterCommit(fn);
+  }
+
+  model(): string | null {
+    const row = this.state.db.prepare("SELECT value FROM vector_meta WHERE key = 'model'").get() as
+      | { value: string }
+      | undefined;
+    return row?.value ?? null;
+  }
+
+  setModel(model: string): void {
+    this.state.db
+      .prepare("INSERT INTO vector_meta (key, value) VALUES ('model', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+      .run(model);
+  }
+
+  // Run before `hydrate`. `untagged` is the model an untagged, non-empty
+  // table is taken to hold (null: the active one). An empty table is simply
+  // tagged, since there is nothing to mix. With `dropStale`, another model's
+  // rows are deleted so the fill pass re-embeds them; without it the caller
+  // must refuse to start.
+  reconcileModel(active: string, untagged: string | null, dropStale: boolean): ModelReconcile {
+    const rows = this.count();
+    const tag = this.model();
+    if (rows === 0) {
+      if (tag !== active) this.setModel(active);
+      return { action: tag === active ? "match" : "tagged", active, rows };
+    }
+    const stored = tag ?? untagged ?? active;
+    if (stored === active) {
+      if (tag !== active) this.setModel(active);
+      return { action: tag === active ? "match" : "adopted", active, rows };
+    }
+    if (!dropStale) return { action: "refuse", active, stored, rows };
+    this.state.transaction(() => {
+      this.clear();
+      this.setModel(active);
+    });
+    return { action: "dropped", active, stored, rows };
   }
 
   count(): number {
