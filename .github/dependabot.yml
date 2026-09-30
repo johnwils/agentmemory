@@ -14,48 +14,18 @@ updates:
     commit-message:
       prefix: deps
       include: scope
+    ignore:
+      # TypeScript 7's native compiler has no compiler API; tsdown's dts step needs one.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      # Types track the Node we run (24 on the hub image and the Mac); move with the runtime.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       minor-and-patch:
         update-types:
           - minor
           - patch
-
-  - package-ecosystem: npm
-    directory: /website
-    schedule:
-      interval: weekly
-      day: monday
-      time: "06:00"
-      timezone: Etc/UTC
-    open-pull-requests-limit: 10
-    labels:
-      - dependencies
-      - npm
-      - website
-    commit-message:
-      prefix: deps(website)
-      include: scope
-    groups:
-      minor-and-patch:
-        update-types:
-          - minor
-          - patch
-
-  - package-ecosystem: npm
-    directory: /integrations/openclaw
-    schedule:
-      interval: weekly
-      day: monday
-      time: "06:00"
-      timezone: Etc/UTC
-    open-pull-requests-limit: 5
-    labels:
-      - dependencies
-      - npm
-      - integrations
-    commit-message:
-      prefix: deps(openclaw)
-      include: scope
 
   - package-ecosystem: npm
     directory: /integrations/pi
