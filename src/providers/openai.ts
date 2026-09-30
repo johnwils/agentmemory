@@ -178,6 +178,11 @@ export class OpenAIProvider implements MemoryProvider {
     if (content) {
       return content;
     }
+    // A reasoning model that ran out of tokens returns only partial
+    // reasoning; storing it would persist chain-of-thought as a summary. #1393
+    if (data.choices?.[0]?.finish_reason === "length") {
+      throw new Error("OpenAI finish_reason length: completion truncated before any content");
+    }
     // Fallback: some thinking models return reasoning but no content.
     // DeepSeek V4 / Qwen3 / GLM / Kimi return `reasoning_content`;
     // older OpenAI o-series + some compatibles return `reasoning`. #627
