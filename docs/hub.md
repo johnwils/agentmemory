@@ -1,8 +1,7 @@
 # Hub deployment
 
 One agentmemory daemon on the LAN hub (`hub`, 192.168.68.52) serves every coding agent on the Mac:
-Claude Code (plugin hooks + MCP), Codex, Cursor and Grok (MCP via `~/.agentmemory/mcp-launch.sh`),
-and Grok capture via `~/Documents/dev/agentmemory-grok`. Clients reach it at
+Claude Code, Codex, Cursor, and Grok. Clients reach it at
 `http://192.168.68.52:3111` with the secret in the hub's `data/.hmac`; the viewer is on `:3113`.
 
 ## Layout on the hub: `/opt/agentmemory`
@@ -56,17 +55,23 @@ npm i -g ./agentmemory-agentmemory-*.tgz && rm agentmemory-agentmemory-*.tgz
 cp clients/mcp-launch.sh ~/.agentmemory/mcp-launch.sh
 ```
 
-- **MCP (Codex, Cursor, Grok, and the Claude Code plugin):** `~/.agentmemory/mcp-launch.sh` loads
+- **MCP (Codex and Cursor):** `~/.agentmemory/mcp-launch.sh` loads
   `~/.agentmemory/.env` (`AGENTMEMORY_URL`, `AGENTMEMORY_SECRET`) and runs the installed
   `dist/standalone.mjs` as a proxy to the hub.
-- **Claude Code hooks:** the plugin from this repository's marketplace
+- **Claude Code and Grok:** the plugin from this repository's marketplace
   (`claude plugin marketplace add johnwils/agentmemory`, then `claude plugin install agentmemory@agentmemory`).
-  After a change here: `claude plugin marketplace update agentmemory && claude plugin update agentmemory@agentmemory`.
-- **Grok capture:** `~/Documents/dev/agentmemory-grok` runs the installed `plugin/scripts`
-  (`AGENTMEMORY_SCRIPTS_DIR` in `~/.config/agentmemory-grok/.env`). Re-run its `bin/install.mjs`
-  after switching fnm's default Node.
+  Grok discovers that install. Enable `agentmemory@agentmemory` in `~/.grok/config.toml`
+  `[plugins].enabled`, and do not also declare `[mcp_servers.agentmemory]`.
+  It runs `hooks/hooks.json` with `CLAUDE_PLUGIN_ROOT` set and attaches `.mcp.json`, which
+  starts the same launcher. The plugin-root `plugin.json` leaves `hooks` and `mcpServers`
+  unset; if those fields are set, Grok follows them and loads Copilot's files instead.
+  After a change here, uninstall and reinstall the plugin when the version string is unchanged:
+  `claude plugin marketplace update agentmemory`, then uninstall and install `agentmemory@agentmemory`.
+- Hook scripts accept Grok's camelCase fields (`toolInput`, `sessionId`, `toolName`,
+  `toolResult`, `subagentType`, `agentId`, `lastAssistantMessage`, `workspaceRoot`)
+  alongside Claude's snake_case names.
 
-Hook scripts skip headless sessions (`claude -p`, Agent SDK) by default.
+Hook scripts skip headless sessions (`claude -p`, Agent SDK) by default. `grok --single` is not that skip.
 
 ## History
 
