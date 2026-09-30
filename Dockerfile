@@ -13,9 +13,10 @@ ARG NODE_IMAGE=node:24.21.0-trixie-slim
 FROM ${NODE_IMAGE} AS build
 WORKDIR /src
 COPY package.json package-lock.json ./
-# Optional deps (local embeddings, CJK segmenters) are not shipped, so they
-# are not built either; --ignore-scripts keeps onnxruntime's download out.
-RUN npm ci --omit=optional --ignore-scripts --no-audit --no-fund
+# The bundler's native binding is an optional dependency, so the build stage
+# installs optionals; --ignore-scripts keeps onnxruntime's download out. The
+# prune below drops them all (local embeddings, CJK segmenters) from the image.
+RUN npm ci --ignore-scripts --no-audit --no-fund
 COPY . .
 RUN npm run build \
  && npm prune --omit=dev --omit=optional --no-audit --no-fund
