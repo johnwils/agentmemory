@@ -456,11 +456,13 @@ describe("handleToolCall", () => {
 
 describe("initialize protocol version negotiation", () => {
   type InitResult = { protocolVersion: string };
-  const handler = () =>
-    vi.mocked(createStdioTransport).mock.calls[0][0] as (
-      method: string,
-      params?: unknown,
-    ) => Promise<InitResult>;
+  // The module registers its handler when it is imported. Read the call at
+  // collection time: mocks are cleared before every test.
+  const registered = vi.mocked(createStdioTransport).mock.calls[0]?.[0] as (
+    method: string,
+    params?: unknown,
+  ) => Promise<InitResult>;
+  const handler = () => registered;
 
   it("echoes a supported requested version", async () => {
     const res = await handler()("initialize", { protocolVersion: "2025-06-18" });
