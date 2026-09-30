@@ -85,6 +85,13 @@ export function buildSyntheticCompression(
   const narrativeParts = [promptStr, inputStr, outputStr].filter(
     (s) => s.length > 0,
   );
+  // Non-tool hooks (notification, subagent_*, task_completed, custom) carry
+  // their content only in raw.raw, and this synthetic row overwrites the raw
+  // one at the same key, so dropping it here loses it for good (#1398).
+  if (narrativeParts.length === 0) {
+    const rawStr = stringifyForNarrative(raw.raw);
+    if (rawStr && rawStr !== "{}") narrativeParts.push(rawStr);
+  }
 
   const result: CompressedObservation = {
     id: raw.id,

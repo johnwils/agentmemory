@@ -213,6 +213,30 @@ describe("buildSyntheticCompression", () => {
     expect(typeof buildSyntheticCompression).toBe("function");
   });
 
+  it("keeps raw content for hook types without tool input or prompt (#1398)", async () => {
+    const { buildSyntheticCompression } = await import(
+      "../src/functions/compress-synthetic.js"
+    );
+    const synth = buildSyntheticCompression({
+      id: "obs_raw",
+      sessionId: "ses_1",
+      timestamp: new Date().toISOString(),
+      hookType: "subagent_stop",
+      raw: { agent_type: "Explore", last_message: "found the retry bug in queue.ts" },
+    });
+    expect(synth.narrative).toContain("found the retry bug in queue.ts");
+    expect(synth.narrative).toContain("Explore");
+
+    const empty = buildSyntheticCompression({
+      id: "obs_empty",
+      sessionId: "ses_1",
+      timestamp: new Date().toISOString(),
+      hookType: "notification",
+      raw: {},
+    });
+    expect(empty.narrative).toBe("");
+  });
+
   it("extracts file paths from tool_input into the files array", async () => {
     const { buildSyntheticCompression } = await import(
       "../src/functions/compress-synthetic.js"
