@@ -1,23 +1,17 @@
-# Hub deployment (one LAN daemon replacing the iii-era /opt/agentmemory
-# stack). Proposed, not applied: the old project stays untouched as rollback.
+# Hub deployment: one LAN daemon at /opt/agentmemory on the hub.
+# Layout there: compose.yml, agentmemory.env (secrets, not in git), backup.sh, data/, backups/.
 services:
   agentmemory:
-    image: agentmemory-sqlite:${AGENTMEMORY_SQLITE_TAG}
-    container_name: agentmemory-sqlite
+    image: agentmemory:${AGENTMEMORY_TAG:?set AGENTMEMORY_TAG in .env}
+    container_name: agentmemory
     restart: unless-stopped
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
       - "0.0.0.0:3111:3111"
       - "0.0.0.0:3113:3113"
     env_file:
-      - /opt/agentmemory/.env          # same keys/model/LLM/viewer settings as today (read-only reuse)
-    environment:
-      AGENTMEMORY_VIEWER_HOST: "0.0.0.0"   # already in .env; explicit here
-      EVICTION_ENABLED: "false"            # fork-only daily mem::evict (10k obs/project cap); keep 0.9.29 parity
-      CONSOLIDATION_ENABLED: "false"       # fork enables it whenever an LLM key is set; 0.9.29 ran with it off
+      - ./agentmemory.env
     volumes:
-      - /opt/agentmemory-sqlite/data:/data # agentmemory.sqlite + .hmac (copied from /opt/agentmemory/data/.hmac)
+      - ./data:/data   # agentmemory.sqlite + .hmac (the REST secret clients use)
     stop_grace_period: 60s
     logging:
       driver: json-file

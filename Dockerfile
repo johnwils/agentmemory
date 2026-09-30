@@ -1,11 +1,11 @@
 # agentmemory daemon: one Node process, one SQLite file under /data.
 #
-#   docker build -t agentmemory-sqlite .
-#   docker run -v /srv/agentmemory:/data -p 3111:3111 -p 3113:3113 agentmemory-sqlite
+#   docker build -t agentmemory .
+#   docker run -v /srv/agentmemory:/data -p 3111:3111 -p 3113:3113 agentmemory
 #
 # /data must be writable by uid 1000. The REST secret is /data/.hmac
-# (generated on first start); see docker/entrypoint.sh. docker/compose.example.yml
-# is a complete service definition.
+# (generated on first start); see docker/entrypoint.sh. docker/hub/compose.yml
+# is the deployed service definition (docs/hub.md).
 
 # Node 24 is the Active LTS; node:sqlite is unflagged from 22.13 (ADR 0001).
 ARG NODE_IMAGE=node:24.21.0-trixie-slim
