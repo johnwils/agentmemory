@@ -110,7 +110,7 @@ import { registerApiTriggers } from "./triggers/api.js";
 import { registerEventTriggers } from "./triggers/events.js";
 import { registerMcpEndpoints } from "./mcp/server.js";
 import { getAllTools } from "./mcp/tools-registry.js";
-import { startViewerServer } from "./viewer/server.js";
+import { isLoopbackHost, startViewerServer } from "./viewer/server.js";
 import { MetricsStore } from "./eval/metrics-store.js";
 import { DedupMap } from "./functions/dedup.js";
 import { registerHealthMonitor } from "./health/monitor.js";
@@ -201,14 +201,25 @@ async function main() {
     );
   }
   bootLog(
-    `REST API: http://localhost:${config.restPort}/agentmemory/*`,
+    `REST API: http://${config.restHost}:${config.restPort}/agentmemory/*`,
   );
-  bootLog(`Streams: ws://localhost:${config.streamsPort}`);
+  bootLog(`Streams: ws://${config.restHost}:${config.streamsPort}`);
+
+  // Off loopback the REST port is the whole store, reachable by anyone who
+  // can route to it; the secret is the only thing between them.
+  if (!isLoopbackHost(config.restHost) && !getEnvVar("AGENTMEMORY_SECRET")) {
+    throw new Error(
+      `AGENTMEMORY_REST_HOST=${config.restHost} requires AGENTMEMORY_SECRET: a non-loopback ` +
+        `bind would serve the REST API unauthenticated. Set the secret, or unset ` +
+        `AGENTMEMORY_REST_HOST to keep the loopback bind.`,
+    );
+  }
 
   // The only runtime: no engine process, no worker bus. The shim binds the
   // REST and stream ports itself, so a bind failure has to be fatal here
   // rather than leaving a daemon up with no listeners.
   const sdk = createInprocSdk({
+    host: config.restHost,
     restPort: config.restPort,
     streamsPort: config.streamsPort,
     sqlitePath,

@@ -182,7 +182,12 @@ export function loadConfig(): AgentMemoryConfig {
     parseInt(env["III_STREAM_PORT"] || env["III_STREAMS_PORT"] || "", 10) ||
     restPort + 1;
 
+  // Loopback unless the Operator opts in (a container publishing its ports
+  // needs 0.0.0.0). The daemon refuses a non-loopback bind without a secret.
+  const restHost = env["AGENTMEMORY_REST_HOST"]?.trim() || "127.0.0.1";
+
   return {
+    restHost,
     restPort,
     streamsPort,
     provider,

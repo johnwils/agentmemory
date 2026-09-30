@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { loadConfig } from "../src/config";
 
 const PORT_ENVS = [
+  "AGENTMEMORY_REST_HOST",
   "III_REST_PORT",
   "III_STREAM_PORT",
   "III_STREAMS_PORT",
@@ -25,6 +26,14 @@ describe("multi-instance port auto-derive (#750)", () => {
         process.env[k] = saved[k];
       }
     }
+  });
+
+  it("binds loopback unless AGENTMEMORY_REST_HOST says otherwise", () => {
+    expect(loadConfig().restHost).toBe("127.0.0.1");
+    process.env["AGENTMEMORY_REST_HOST"] = " 0.0.0.0 ";
+    expect(loadConfig().restHost).toBe("0.0.0.0");
+    process.env["AGENTMEMORY_REST_HOST"] = "";
+    expect(loadConfig().restHost).toBe("127.0.0.1");
   });
 
   it("default REST anchor yields the canonical 3111/3112 pair", () => {

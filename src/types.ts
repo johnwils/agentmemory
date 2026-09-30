@@ -194,6 +194,8 @@ export interface MemoryProvider {
 }
 
 export interface AgentMemoryConfig {
+  // Interface the REST and stream ports bind (AGENTMEMORY_REST_HOST).
+  restHost: string;
   restPort: number;
   streamsPort: number;
   provider: ProviderConfig;
