@@ -49,6 +49,7 @@ describe("Copilot plugin manifest (plugin/plugin.json)", () => {
     const manifestPath = join(pluginRoot, "plugin.json");
     expect(existsSync(manifestPath)).toBe(true);
     const manifest = readJson<{
+      $schema?: string;
       name: string;
       version: string;
       description?: string;
@@ -56,12 +57,17 @@ describe("Copilot plugin manifest (plugin/plugin.json)", () => {
       mcpServers?: string;
       hooks?: string;
     }>(manifestPath);
+    expect(manifest.$schema).toBe(
+      "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+    );
     expect(manifest.name).toBe("agentmemory");
     expect(manifest.name).toMatch(/^[a-z][a-z0-9-]*$/);
     expect(manifest.version).toMatch(/^\d+\.\d+\.\d+/);
-    expect(manifest.skills).toBeDefined();
-    expect(manifest.mcpServers).toBeDefined();
-    expect(manifest.hooks).toBeDefined();
+    // Grok follows these when set, and would load the Copilot files instead of
+    // hooks/hooks.json and .mcp.json. Copilot 1.0 reads its own fixed paths.
+    expect(manifest.skills).toBeUndefined();
+    expect(manifest.mcpServers).toBeUndefined();
+    expect(manifest.hooks).toBeUndefined();
   });
 
   it("manifest version matches main package.json", () => {
@@ -72,20 +78,18 @@ describe("Copilot plugin manifest (plugin/plugin.json)", () => {
     expect(pluginVer).toBe(pkgVer);
   });
 
-  it("all referenced manifest paths resolve to existing files / directories", () => {
-    const manifest = readJson<{ skills: string; mcpServers: string; hooks: string }>(
-      join(pluginRoot, "plugin.json"),
+  it("Grok convention files and Copilot fixed paths exist", () => {
+    expect(existsSync(join(pluginRoot, "skills"))).toBe(true);
+    expect(existsSync(join(pluginRoot, "hooks/hooks.json"))).toBe(true);
+    expect(existsSync(join(pluginRoot, ".mcp.json"))).toBe(true);
+    expect(existsSync(join(pluginRoot, "mcp.json"))).toBe(true);
+    expect(existsSync(join(pluginRoot, "com.github.copilot/hooks/hooks.json"))).toBe(
+      true,
     );
-    const manifestDir = pluginRoot;
-    expect(existsSync(resolve(manifestDir, manifest.skills))).toBe(true);
-    expect(existsSync(resolve(manifestDir, manifest.mcpServers))).toBe(true);
-    expect(existsSync(resolve(manifestDir, manifest.hooks))).toBe(true);
   });
 
   it("skills path resolves and contains all known skill directories", () => {
-    const manifest = readJson<{ skills: string }>(join(pluginRoot, "plugin.json"));
-    const manifestDir = pluginRoot;
-    const skillsPath = resolve(manifestDir, manifest.skills);
+    const skillsPath = join(pluginRoot, "skills");
     for (const skill of KNOWN_SKILL_DIRS) {
       expect(
         existsSync(join(skillsPath, skill)),
@@ -95,23 +99,26 @@ describe("Copilot plugin manifest (plugin/plugin.json)", () => {
   });
 });
 
-describe("Copilot MCP config (.mcp.copilot.json)", () => {
+describe("Copilot MCP config (mcp.json)", () => {
   it("file exists with expected shape", () => {
-    const mcpPath = join(pluginRoot, ".mcp.copilot.json");
+    const mcpPath = join(pluginRoot, "mcp.json");
     expect(existsSync(mcpPath)).toBe(true);
     const config = readJson<{
+      $schema: string;
       mcpServers: {
         agentmemory: {
           type: string;
           command: string;
           args: string[];
           env: Record<string, string>;
-          tools: string[];
         };
       };
     }>(mcpPath);
+    expect(config.$schema).toBe(
+      "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+    );
     const server = config.mcpServers.agentmemory;
-    expect(server.type).toBe("local");
+    expect(server.type).toBe("stdio");
     expect(server.command).toBe("npx");
     expect(server.args).toEqual(["-y", "@agentmemory/mcp"]);
     expect(server.env["AGENTMEMORY_URL"]).toBe(
@@ -119,11 +126,10 @@ describe("Copilot MCP config (.mcp.copilot.json)", () => {
     );
     expect(server.env["AGENTMEMORY_SECRET"]).toBe("${AGENTMEMORY_SECRET:-}");
     expect(server.env["AGENTMEMORY_TOOLS"]).toBe("${AGENTMEMORY_TOOLS:-all}");
-    expect(server.tools).toContain("*");
   });
 });
 
-describe("Copilot hooks config (hooks/hooks.copilot.json)", () => {
+describe("Copilot hooks config (com.github.copilot/hooks/hooks.json)", () => {
   type HookEntry = {
     type: string;
     command?: string;
@@ -134,7 +140,7 @@ describe("Copilot hooks config (hooks/hooks.copilot.json)", () => {
 
   function loadHooks() {
     return readJson<{ version: number; hooks: Record<string, HookEntry[]> }>(
-      join(pluginRoot, "hooks/hooks.copilot.json"),
+      join(pluginRoot, "com.github.copilot/hooks/hooks.json"),
     );
   }
 
@@ -150,7 +156,7 @@ describe("Copilot hooks config (hooks/hooks.copilot.json)", () => {
     for (const event of Object.keys(config.hooks)) {
       expect(
         SUPPORTED_COPILOT_EVENTS.has(event),
-        `unsupported event "${event}" in hooks.copilot.json`,
+        `unsupported event "${event}" in com.github.copilot/hooks/hooks.json`,
       ).toBe(true);
     }
   });

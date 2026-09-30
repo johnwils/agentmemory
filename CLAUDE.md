@@ -50,7 +50,7 @@ The Engine keeps the three primitives (Worker/Function/Trigger) as its internal 
 5. `test/mcp-standalone.test.ts` — per-group tool count assertion
 6. `test/tool-count-consistency.test.ts` — `EXPECTED_TOOL_COUNT`
 7. `plugin/.claude-plugin/plugin.json` — tool count in description
-8. `plugin/plugin.json` and `plugin/.mcp.copilot.json` (when present) — tool count or MCP exposure
+8. `plugin/plugin.json` and `plugin/mcp.json` (when present) — tool count or MCP exposure
 9. `npm run skills:gen` — regenerates the counts and tables in `plugin/skills/*/REFERENCE.md`
 
 **When adding REST endpoints, you MUST update:**
@@ -66,6 +66,8 @@ The Engine keeps the three primitives (Worker/Function/Trigger) as its internal 
 5. `test/export-import.test.ts` — version assertion
 6. `plugin/.claude-plugin/plugin.json` — version field
 7. `plugin/plugin.json` (when present) — version field
+
+Grok reads the plugin-root `plugin.json` and follows `hooks` and `mcpServers` when they are set. Leave both unset so it discovers `hooks/hooks.json` and `.mcp.json`. Copilot reads `plugin/com.github.copilot/hooks/hooks.json` and `plugin/mcp.json`.
 
 **When adding new KV scopes:**
 1. `src/state/schema.ts` — add to the KV object
@@ -199,7 +201,7 @@ the only install path is clone → `npm ci` → `npm run build` →
 `npm link`. Any doc that tells a user how to install must describe that path, never
 `npx`/`npm install -g @agentmemory/*`, which resolve to upstream's code. The one exception is
 the `@agentmemory/mcp` shim wherever it is invoked as a proxy — `plugin/.mcp.json` and
-`plugin/.mcp.copilot.json` — because in proxy mode the tool surface comes from this fork's
+`plugin/mcp.json` — because in proxy mode the tool surface comes from this fork's
 running server, not from the shim. The translated `READMEs/` were deleted rather than kept
 stale — do not re-add translations without a way to keep them current.
 
