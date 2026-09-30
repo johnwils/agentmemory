@@ -91,6 +91,8 @@ function fitsOneChunk(counts: number[], budget: number): boolean {
 // count already fits one chunk is safe to skip measuring: on a broker that queues
 // tokenize behind generation, one request per Observation is load the summary
 // itself has to wait behind.
+let tokenCountWarned = false;
+
 async function countObservationTokens(
   provider: MemoryProvider,
   texts: string[],
@@ -105,10 +107,15 @@ async function countObservationTokens(
         provider.countTokens!(t),
       );
     } catch (err) {
-      logger.warn("Token count failed, packing chunks by estimate", {
-        sessionId,
-        error: err instanceof Error ? err.message : String(err),
-      });
+      // Most OpenAI-compatible hosts (DeepInfra, OpenAI itself) have no
+      // /tokenize; the estimate is the normal path there, so say it once.
+      if (!tokenCountWarned) {
+        tokenCountWarned = true;
+        logger.warn("Token count unavailable, packing chunks by estimate", {
+          sessionId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
   }
   return estimates;
