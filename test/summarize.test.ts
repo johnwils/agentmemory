@@ -682,6 +682,44 @@ describe("mem::summarize Session Summary reuse", () => {
     expect(provider.calls).toHaveLength(1);
   });
 
+  it("concurrent calls for one Session pay for one summary; the rest reuse it", async () => {
+    const { handler, provider } = await withStoredSummary("ses_race", 12, 10);
+    const slow = provider.summarize;
+    provider.summarize = async (system: string, user: string) => {
+      await new Promise((r) => setTimeout(r, 20));
+      return slow(system, user);
+    };
+
+    const results: any[] = await Promise.all([
+      handler({ sessionId: "ses_race" }),
+      handler({ sessionId: "ses_race" }),
+      handler({ sessionId: " ses_race " }),
+    ]);
+
+    expect(provider.calls).toHaveLength(1);
+    expect(results.map((r) => r.success)).toEqual([true, true, true]);
+    expect(results.map((r) => r.reused === true)).toEqual([false, true, true]);
+    expect(results.every((r) => r.summary.title === "fresh")).toBe(true);
+  });
+
+  it("calls for different Sessions do not wait on each other", async () => {
+    const a = await withStoredSummary("ses_a", 12, 10);
+    const b = await withStoredSummary("ses_b", 12, 10);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const slow = a.provider.summarize;
+    a.provider.summarize = async (system: string, user: string) => {
+      await gate;
+      return slow(system, user);
+    };
+
+    const pendingA = a.handler({ sessionId: "ses_a" });
+    const resultB: any = await b.handler({ sessionId: "ses_b" });
+    expect(resultB.success).toBe(true);
+    release();
+    expect(((await pendingA) as any).success).toBe(true);
+  });
+
   it("force: true calls the provider even when the summary is current", async () => {
     const { handler, provider } = await withStoredSummary("ses_force", 10, 10);
 

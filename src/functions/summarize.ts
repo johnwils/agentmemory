@@ -6,6 +6,7 @@ import type {
   Session,
 } from "../types.js";
 import { KV } from "../state/schema.js";
+import { withKeyedLock } from "../state/keyed-mutex.js";
 import { StateKV } from "../state/kv.js";
 import {
   SUMMARY_SYSTEM,
@@ -331,8 +332,18 @@ export function registerSummarizeFunction(
   provider: MemoryProvider,
   metricsStore?: MetricsStore,
 ): void {
-  sdk.registerFunction("mem::summarize", 
-    async (data: { sessionId: string; force?: boolean } | undefined) => {
+  // Single-flight per Session. The freshness check below only helps a call
+  // that starts after the previous summary was written: two stops for one
+  // Session (a turn-end and a SessionEnd, or a stop racing POST /summarize)
+  // would otherwise both find it stale and both pay for the same summary.
+  // Serialized, the second finds the first's summary current and reuses it.
+  sdk.registerFunction("mem::summarize", (data: { sessionId: string; force?: boolean } | undefined) =>
+    withKeyedLock(`summarize:${typeof data?.sessionId === "string" ? data.sessionId.trim() : ""}`, () =>
+      summarizeSession(data),
+    ),
+  );
+
+  async function summarizeSession(data: { sessionId: string; force?: boolean } | undefined) {
       const startMs = Date.now();
       if (!data || typeof data.sessionId !== "string" || !data.sessionId.trim()) {
         return { success: false, error: "sessionId is required" };
@@ -519,6 +530,5 @@ export function registerSummarizeFunction(
         });
         return { success: false, error: msg };
       }
-    },
-  );
+  }
 }
