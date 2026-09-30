@@ -70,7 +70,7 @@
     "tiny-segmenter": "^0.2.0"
   },
   "devDependencies": {
-    "@types/node": "^25.9.1",
+    "@types/node": "^26.6.3",
     "@types/ws": "^8.18.1",
     "tsdown": "^0.23.0",
     "tsx": "^4.19.0",
