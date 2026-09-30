@@ -229,10 +229,35 @@ async function main() {
 
   writeWorkerPidfile();
 
+  // Installed as soon as the store is open, not after boot: the first boot
+  // after an import spends minutes on one-time work (graph index backfill)
+  // before reaching the end of main(), and a SIGTERM in that window used to
+  // kill the process without closing the store. Later stages register what
+  // they need stopped; they run newest first, then the engine closes.
+  const stoppers: Array<() => void | Promise<void>> = [];
+  const onShutdown = (fn: () => void | Promise<void>) => stoppers.push(fn);
+  let stopping = false;
+  const shutdown = async () => {
+    if (stopping) return;
+    stopping = true;
+    console.log(`\n[agentmemory] Shutting down...`);
+    for (const stop of stoppers.reverse()) {
+      try {
+        await stop();
+      } catch {}
+    }
+    await sdk.shutdown();
+    clearWorkerPidfile();
+    process.exit(0);
+  };
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+
   const kv = new StateKV(sdk);
   const secret = getEnvVar("AGENTMEMORY_SECRET");
   const metricsStore = new MetricsStore(kv);
   const dedupMap = new DedupMap();
+  onShutdown(() => dedupMap.stop());
 
   const vectorIndex = embeddingProvider ? new VectorIndex() : null;
 
@@ -432,6 +457,7 @@ async function main() {
   registerMcpEndpoints(sdk, kv, secret, metricsStore);
 
   const healthMonitor = registerHealthMonitor(sdk, kv);
+  onShutdown(() => healthMonitor.stop());
 
   // Vectors of two embedding models are incomparable even at one width, so
   // the table is held to the active model before anything is loaded from it.
@@ -710,17 +736,7 @@ async function main() {
     bootLog(`Auto-consolidation: enabled (every ${consolidationIntervalMs / 60000}m)`);
   }
 
-  const shutdown = async () => {
-    console.log(`\n[agentmemory] Shutting down...`);
-    healthMonitor.stop();
-    dedupMap.stop();
-    await new Promise<void>((resolve) => viewerServer.close(() => resolve()));
-    await sdk.shutdown();
-    clearWorkerPidfile();
-    process.exit(0);
-  };
-  process.on("SIGINT", shutdown);
-  process.on("SIGTERM", shutdown);
+  onShutdown(() => new Promise<void>((resolve) => viewerServer.close(() => resolve())));
 }
 
 main().catch((err) => {
