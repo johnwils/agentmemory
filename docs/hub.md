@@ -1,5 +1,12 @@
 # Hub deployment
 
+> **Retired 2026-10-01.** This fork no longer runs anywhere: the hub daemon, its data and every Mac client
+> were removed and replaced by self-hosted [Hindsight](https://github.com/vectorize-io/hindsight)
+> (bake-off and runbook in `~/Documents/dev/hindsight-bakeoff/`). The final archive (sqlite backup plus
+> per-project memories, lessons and session summaries) is on the hub at `/opt/archive/agentmemory-final/`.
+> Do not reinstall the plugin, hooks or `clients/update-mac.sh`.
+
+
 One agentmemory daemon on the LAN hub (`hub`, 192.168.68.52) serves every coding agent on the Mac:
 Claude Code, Codex, Cursor, and Grok. Clients reach it at
 `http://192.168.68.52:3111` with the secret in the hub's `data/.hmac`; the viewer is on `:3113`.

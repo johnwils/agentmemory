@@ -1,5 +1,12 @@
 # agentmemory — Agent Instructions
 
+> **Retired 2026-10-01.** This fork no longer runs anywhere: the hub daemon, its data and every Mac client
+> were removed and replaced by self-hosted [Hindsight](https://github.com/vectorize-io/hindsight)
+> (bake-off and runbook in `~/Documents/dev/hindsight-bakeoff/`). The final archive (sqlite backup plus
+> per-project memories, lessons and session summaries) is on the hub at `/opt/archive/agentmemory-final/`.
+> Do not reinstall the plugin, hooks or `clients/update-mac.sh`.
+
+
 ## Goal
 
 Put the right Memory in front of an Agent at the moment it needs it, and pay as little as
